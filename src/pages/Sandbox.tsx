@@ -17,6 +17,8 @@ export default function Sandbox() {
       color: '#f59e0b',
       stops: userStops,
       status: 'experimental',
+      scope: 'exploratory',
+      omicsCategory: 'DNA',
       supportedVariants: ['SNV', 'Indel']
     };
     return [...LINES, customLine];
@@ -40,7 +42,7 @@ export default function Sandbox() {
 
     return `#!/bin/bash
 # ──────────────────────────────────────────────
-# MutaMetro Generated Pipeline
+# MetrOmics Generated Pipeline
 # Generated: ${new Date().toISOString().split('T')[0]}
 # ──────────────────────────────────────────────
 

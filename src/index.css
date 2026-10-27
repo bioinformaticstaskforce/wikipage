@@ -360,3 +360,90 @@ img { max-width: 100%; display: block; }
   padding: 1rem;
   border-radius: var(--radius-sm);
 }
+
+/* ── Omics Category Cards ────────────────────────────────── */
+.omics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.omics-card {
+  background: var(--bg-secondary);
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+.omics-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--brand-primary);
+  box-shadow: var(--shadow-md);
+}
+
+.omics-card.active {
+  border-color: var(--brand-primary);
+  background: var(--bg-secondary);
+  box-shadow: 0 0 0 2px var(--brand-glow), var(--shadow-md);
+}
+
+.omics-card.disabled {
+  opacity: 0.85;
+}
+
+.omics-badge-active {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.omics-badge-roadmap {
+  background: rgba(139, 92, 246, 0.12);
+  color: #7c3aed;
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* ── File Format Tags ────────────────────────────────────── */
+.file-io-box {
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  padding: 0.9rem;
+  border: 1px solid var(--border-subtle);
+}
+
+.file-pill {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+.file-pill-fastq { background: rgba(59, 130, 246, 0.15); color: #2563eb; }
+.file-pill-bam { background: rgba(16, 185, 129, 0.15); color: #059669; }
+.file-pill-vcf { background: rgba(220, 38, 38, 0.15); color: #dc2626; }
+.file-pill-table { background: rgba(245, 158, 11, 0.15); color: #d97706; }
+.file-pill-html { background: rgba(139, 92, 246, 0.15); color: #7c3aed; }
+.file-pill-dir { background: rgba(100, 116, 139, 0.15); color: #475569; }
+

@@ -16,7 +16,7 @@ export default function WikiIndex() {
     <div style={{ paddingBottom: '4rem' }}>
       <div style={{ marginBottom: '3rem', textAlign: 'center' }}>
         <h1 style={{ fontSize: '2.75rem', fontWeight: 800, margin: '0 0 0.5rem', letterSpacing: '-0.02em' }}>
-          MutaMetro <span style={{ color: 'var(--brand-primary)' }}>Wiki Hub</span>
+          MetrOmics <span style={{ color: 'var(--brand-primary)' }}>Wiki Hub</span>
         </h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: '1.15rem', maxWidth: '600px', margin: '0 auto' }}>
           The central repository for pipeline documentation, tool references, and theoretical concepts.

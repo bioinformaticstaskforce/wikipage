@@ -13,11 +13,22 @@ const COLOR_MAP: Record<string, string> = {
   'var(--line-onco)': '#dc2626',
 };
 
+function getFormatBadgeClass(format: string): string {
+  const f = format.toLowerCase();
+  if (f.includes('fastq')) return 'file-pill file-pill-fastq';
+  if (f.includes('bam') || f.includes('cram') || f.includes('bai')) return 'file-pill file-pill-bam';
+  if (f.includes('vcf')) return 'file-pill file-pill-vcf';
+  if (f.includes('table') || f.includes('tsv') || f.includes('txt') || f.includes('json')) return 'file-pill file-pill-table';
+  if (f.includes('html')) return 'file-pill file-pill-html';
+  return 'file-pill file-pill-dir';
+}
+
 export default function MapPage() {
   const [searchParams] = useSearchParams();
   const materialParam = searchParams.get('material');
   const [selectedStation, setSelectedStation] = useState<{ station: Station; lineIds: string[] } | null>(null);
   const [activeVariantFilter, setActiveVariantFilter] = useState<VariantType | 'All'>('All');
+  const [technologyFilter, setTechnologyFilter] = useState<string>('All');
   const [highlightedLineId, setHighlightedLineId] = useState<string | null>(null);
 
   // Recommender State
@@ -52,27 +63,33 @@ export default function MapPage() {
   const selectedTool = selectedStation ? TOOLS[selectedStation.station.toolId] : null;
   const selectedStep = selectedStation ? STEPS.find((s) => s.id === selectedStation.station.stepId) : null;
   
-  const filteredLines = activeVariantFilter === 'All' 
-    ? LINES 
-    : LINES.filter(line => line.supportedVariants.includes(activeVariantFilter));
+  const filteredLines = LINES.filter(line => {
+    const matchesVariant = activeVariantFilter === 'All' || line.supportedVariants.includes(activeVariantFilter);
+    const matchesTech = technologyFilter === 'All' || line.technology === technologyFilter;
+    return matchesVariant && matchesTech;
+  });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '1.5rem', boxSizing: 'border-box' }}>
       {/* Header row */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '1rem', flexShrink: 0, flexWrap: 'wrap', gap: '1rem' }}>
         <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+            <span className="omics-badge-active">🧬 DNA / Genomics · Active Module</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Illumina Short-Read Consensus</span>
+          </div>
           <h1 style={{ fontSize: '1.75rem', fontWeight: 800, margin: '0 0 0.25rem', letterSpacing: '-0.02em' }}>
             Interactive Pipeline Map
           </h1>
           <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.9rem' }}>
-            Click any station to view tool details.
+            Click any station to view tool rationale, I/O file flow, and parameter recommendations.
           </p>
         </div>
         
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', alignItems: 'flex-end' }}>
           
-          {/* Recommender Dropdowns */}
-          <div style={{ display: 'flex', gap: '0.5rem', background: 'var(--bg-secondary)', padding: '0.4rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--brand-primary)', boxShadow: '0 0 0 1px rgba(var(--brand-primary-rgb), 0.2)' }}>
+          {/* Recommender & Platform Dropdowns */}
+          <div style={{ display: 'flex', gap: '0.5rem', background: 'var(--bg-secondary)', padding: '0.4rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--brand-primary)', boxShadow: '0 0 0 1px rgba(var(--brand-primary-rgb), 0.2)', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--brand-primary)', alignSelf: 'center', marginLeft: '0.25rem' }}>Suggest:</span>
             <select 
               value={recommenderGoal} 
@@ -94,6 +111,18 @@ export default function MapPage() {
               <option value="fresh">Fresh Frozen / Blood</option>
               <option value="ffpe">FFPE Tissue</option>
               <option value="cfdna">Liquid Biopsy (cfDNA)</option>
+            </select>
+
+            <select 
+              value={technologyFilter} 
+              onChange={(e) => setTechnologyFilter(e.target.value)}
+              style={{ padding: '0.25rem 0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.8rem', outline: 'none' }}
+              title="Filter by sequencing technology / platform"
+            >
+              <option value="All">Platform: All</option>
+              <option value="Illumina">Illumina (Short-Read)</option>
+              <option value="Nanopore" disabled>Nanopore (Roadmap)</option>
+              <option value="PacBio" disabled>PacBio HiFi (Roadmap)</option>
             </select>
           </div>
 
@@ -233,6 +262,63 @@ export default function MapPage() {
                   <GlossaryText text={selectedTool.technical} />
                 </p>
               </div>
+
+              {/* Data Flow (Input & Output Files) */}
+              {((selectedTool.inputFiles && selectedTool.inputFiles.length > 0) || 
+                (selectedTool.outputFiles && selectedTool.outputFiles.length > 0)) && (
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                    <p className="section-label" style={{ margin: 0 }}>Data Flow & File I/O</p>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Input → Output</span>
+                  </div>
+
+                  <div className="file-io-box">
+                    {/* Input Files */}
+                    {selectedTool.inputFiles && selectedTool.inputFiles.length > 0 && (
+                      <div style={{ marginBottom: selectedTool.outputFiles?.length ? '0.75rem' : 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', fontWeight: 700, color: '#2563eb', marginBottom: '0.35rem' }}>
+                          <span>📥 Input Files</span>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                          {selectedTool.inputFiles.map((f, i) => (
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-secondary)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)' }}>{f.name}</span>
+                                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{f.description}</span>
+                              </div>
+                              <span className={getFormatBadgeClass(f.format)} style={{ flexShrink: 0, marginLeft: '0.5rem' }}>
+                                {f.format}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Output Files */}
+                    {selectedTool.outputFiles && selectedTool.outputFiles.length > 0 && (
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', fontWeight: 700, color: '#059669', marginBottom: '0.35rem' }}>
+                          <span>📤 Output Files</span>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                          {selectedTool.outputFiles.map((f, i) => (
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-secondary)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)' }}>{f.name}</span>
+                                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{f.description}</span>
+                              </div>
+                              <span className={getFormatBadgeClass(f.format)} style={{ flexShrink: 0, marginLeft: '0.5rem' }}>
+                                {f.format}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Recommended Parameters */}
               {selectedTool.params && (

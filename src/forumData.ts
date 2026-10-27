@@ -94,7 +94,7 @@ What does the community think? Are there specific SV callers you'd like to see p
   },
   {
     id: 'd3',
-    title: 'Welcome to the MutaMetro Discussions!',
+    title: 'Welcome to the MetrOmics Discussions!',
     category: 'Announcements',
     author: 'admin',
     authorAvatar: 'AD',
@@ -102,7 +102,7 @@ What does the community think? Are there specific SV callers you'd like to see p
     upvotes: 24,
     createdAt: '3 days ago',
     isAnswered: false,
-    content: `Welcome to the new MutaMetro community forum! 
+    content: `Welcome to the new MetrOmics community forum! 
 
 This space is designed to operate similarly to GitHub Discussions. You can ask questions about specific pipelines, propose new ideas, and help others troubleshoot their workflows.
 

@@ -1,11 +1,12 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { ChevronRight, RotateCcw, AlertTriangle, X } from 'lucide-react';
+import { ChevronRight, RotateCcw, AlertTriangle, X, Sparkles, MessageSquare, ArrowRight } from 'lucide-react';
 import GlossaryText from '../components/GlossaryText';
 import Badge from '../components/Badge';
 import CompareTable from '../components/CompareTable';
 import TubeMap from '../components/TubeMap';
-import { LINES, SITE_TAGLINE } from '../data';
+import { LINES, SITE_TAGLINE, OMICS_CATEGORIES } from '../data';
+import type { OmicsCategory } from '../data';
 
 const COLOR_MAP: Record<string, string> = {
   'var(--line-sarek)': '#059669',
@@ -13,8 +14,36 @@ const COLOR_MAP: Record<string, string> = {
   'var(--line-onco)': '#dc2626',
 };
 
+const ROADMAP_DETAILS: Record<string, { plannedPipelines: string[]; technologies: string[]; quarter: string; focus: string }> = {
+  RNA: {
+    plannedPipelines: ['nf-core/rnaseq', 'STAR-Fusion', 'Arriba', 'Salmon / DESeq2'],
+    technologies: ['Illumina NovaSeq', 'PacBio Iso-Seq (Full-Length)', 'Oxford Nanopore Direct RNA'],
+    quarter: 'Q1 2026',
+    focus: 'Transcript quantification, alternative splicing, gene fusion detection, and clinical expression profiling.'
+  },
+  Methylation: {
+    plannedPipelines: ['nf-core/methylseq', 'Bismark', 'bwa-meth', 'MethylDackel'],
+    technologies: ['Whole-Genome Bisulfite (WGBS)', 'Enzymatic Methyl-seq (EM-seq)', 'Nanopore 5mC/5hmC direct calling'],
+    quarter: 'Q2 2026',
+    focus: 'CpG island methylation, differential methylation regions (DMRs), and epigenetic biomarker discovery.'
+  },
+  Proteomics: {
+    plannedPipelines: ['nf-core/proteomicslfq', 'MaxQuant', 'FragPipe / MSFragger', 'DIA-NN'],
+    technologies: ['DDA Orbitrap', 'DIA timsTOF (Bruker)', 'TMT Isobaric Multiplexing'],
+    quarter: 'Q2 2026',
+    focus: 'High-throughput protein identification, label-free quantification (LFQ), and post-translational modifications (PTMs).'
+  },
+  Fragmentomics: {
+    plannedPipelines: ['Griffin nucleosome profiler', 'ICHOR-CNA', 'WisecondorX', 'Fragment size ratio callers'],
+    technologies: ['cfDNA ultra-deep sequencing', 'Targeted cancer liquid biopsy assays'],
+    quarter: 'Q3 2026',
+    focus: 'Cell-free DNA fragment size distribution, end-motif profiling, and tissue-of-origin deconvolution.'
+  }
+};
+
 export default function Home() {
   const navigate = useNavigate();
+  const [selectedOmics, setSelectedOmics] = useState<OmicsCategory>('DNA');
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [variantType, setVariantType] = useState<string>('');
   const [material, setMaterial] = useState<string>('');
@@ -44,10 +73,12 @@ export default function Home() {
     return () => { document.body.style.overflow = 'auto'; };
   }, [showMapModal]);
 
+  const activeRoadmap = selectedOmics !== 'DNA' ? ROADMAP_DETAILS[selectedOmics] : null;
+
   return (
     <div>
       {/* Hero */}
-      <section style={{ padding: '5rem 0 4rem', textAlign: 'center', maxWidth: '860px', margin: '0 auto' }}>
+      <section style={{ padding: '4.5rem 0 3.5rem', textAlign: 'center', maxWidth: '900px', margin: '0 auto' }}>
         <div style={{
           display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
           background: 'var(--brand-glow)', padding: '0.35rem 1rem', borderRadius: '2rem',
@@ -58,30 +89,149 @@ export default function Home() {
         </div>
 
         <h1 style={{ fontSize: 'clamp(2.2rem, 5vw, 3.5rem)', fontWeight: 800, marginBottom: '1.25rem', lineHeight: 1.1, letterSpacing: '-0.03em' }}>
-          Standardized workflows for<br />
+          Consolidated Workflows for<br />
           <span style={{ backgroundImage: 'var(--brand-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-            DNA Mutational Analysis
+            Multi-Omic Analysis
           </span>
         </h1>
 
-        <p style={{ fontSize: '1.15rem', color: 'var(--text-secondary)', maxWidth: '640px', margin: '0 auto 2.5rem', lineHeight: 1.7 }}>
-          {SITE_TAGLINE}. We visualize established workflows like <strong style={{ color: 'var(--text-primary)' }}>GATK Best Practices</strong>,{' '}
-          <strong style={{ color: 'var(--text-primary)' }}>Sarek</strong>, and{' '}
-          <strong style={{ color: 'var(--text-primary)' }}>OncoAnalyzer</strong> — highlighting consensus tools on the path from raw FASTQ to annotated variants.
+        <p style={{ fontSize: '1.15rem', color: 'var(--text-secondary)', maxWidth: '680px', margin: '0 auto 2.5rem', lineHeight: 1.7 }}>
+          {SITE_TAGLINE}. We map validated community pipelines — from raw sequencing reads to clinical reports — across genomics, transcriptomics, epigenetics, and emerging molecular technologies.
         </p>
 
         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap' }}>
           <Link to="/map" className="btn btn-primary" style={{ padding: '0.7rem 1.5rem', fontSize: '0.95rem' }}>
-            Open Pipeline Map →
+            Open Interactive Map →
           </Link>
           <Link to="/guides" className="btn btn-outline" style={{ padding: '0.7rem 1.5rem', fontSize: '0.95rem' }}>
-            Browse Guidelines
+            Clinical Guidelines
           </Link>
         </div>
       </section>
 
-      {/* Start Here Selector */}
-      <section style={{ maxWidth: '800px', margin: '0 auto 5rem', textAlign: 'center' }}>
+      {/* Multi-Omic Domain Selector (Livello iniziale di navigazione) */}
+      <section style={{ maxWidth: '1200px', margin: '0 auto 4.5rem' }}>
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: 'var(--brand-primary)', fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>
+            <Sparkles size={14} /> Multi-Omic Architecture
+          </div>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 700, margin: '0 0 0.5rem', letterSpacing: '-0.02em' }}>
+            Select an Omics Discipline
+          </h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', margin: 0 }}>
+            Choose a module to explore active standard workflows or view our technical roadmap for upcoming pipelines.
+          </p>
+        </div>
+
+        <div className="omics-grid">
+          {OMICS_CATEGORIES.map((cat) => {
+            const isSelected = selectedOmics === cat.id;
+            return (
+              <div
+                key={cat.id}
+                className={`omics-card ${isSelected ? 'active' : ''} ${!cat.available ? 'disabled' : ''}`}
+                onClick={() => setSelectedOmics(cat.id)}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                  <span style={{ fontSize: '2rem' }}>{cat.icon}</span>
+                  {cat.available ? (
+                    <span className="omics-badge-active">
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#059669' }} />
+                      Active (3 Lines)
+                    </span>
+                  ) : (
+                    <span className="omics-badge-roadmap">
+                      Roadmap
+                    </span>
+                  )}
+                </div>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 700, margin: '0 0 0.4rem' }}>{cat.label}</h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0 0 1rem', lineHeight: 1.5, flex: 1 }}>
+                  {cat.description}
+                </p>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--border-subtle)', paddingTop: '0.75rem' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: isSelected ? 'var(--brand-primary)' : 'var(--text-muted)' }}>
+                    {cat.available ? 'Explore Active Pipelines →' : 'View Specifications →'}
+                  </span>
+                  {isSelected && <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--brand-primary)' }} />}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Non-DNA Category Expansion Panel */}
+        {selectedOmics !== 'DNA' && activeRoadmap && (
+          <div style={{
+            marginTop: '1.75rem',
+            background: 'var(--bg-secondary)',
+            borderRadius: 'var(--radius-xl)',
+            border: '1.5px solid var(--border-color)',
+            padding: '2rem',
+            boxShadow: 'var(--shadow-md)',
+            animation: 'fadeIn 0.3s ease'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
+                  <span className="omics-badge-roadmap">Planned Release: {activeRoadmap.quarter}</span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Working Group Active</span>
+                </div>
+                <h3 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>
+                  {OMICS_CATEGORIES.find(c => c.id === selectedOmics)?.icon} {OMICS_CATEGORIES.find(c => c.id === selectedOmics)?.label} Module
+                </h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', margin: '0.5rem 0 0' }}>
+                  {activeRoadmap.focus}
+                </p>
+              </div>
+
+              <button 
+                onClick={() => setSelectedOmics('DNA')}
+                className="btn btn-outline"
+                style={{ fontSize: '0.85rem' }}
+              >
+                Back to DNA Pipelines
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginTop: '1.5rem' }}>
+              <div style={{ background: 'var(--bg-tertiary)', padding: '1.25rem', borderRadius: 'var(--radius-md)' }}>
+                <p className="section-label" style={{ marginTop: 0 }}>Candidate Consensus Pipelines</p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  {activeRoadmap.plannedPipelines.map((pipe) => (
+                    <span key={pipe} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '0.35rem 0.65rem', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
+                      {pipe}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ background: 'var(--bg-tertiary)', padding: '1.25rem', borderRadius: 'var(--radius-md)' }}>
+                <p className="section-label" style={{ marginTop: 0 }}>Target Sequencing Platforms</p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  {activeRoadmap.technologies.map((tech) => (
+                    <span key={tech} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '0.35rem 0.65rem', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                      {tech}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', borderTop: '1px solid var(--border-subtle)', paddingTop: '1.25rem' }}>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                Have specific tool or benchmarking recommendations for this module?
+              </span>
+              <Link to="/forum" className="btn btn-outline" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
+                <MessageSquare size={14} /> Join Discussion & Propose Tools
+              </Link>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* DNA Pipeline Recommender (Active Module Wizard) */}
+      <section style={{ maxWidth: '820px', margin: '0 auto 5rem', textAlign: 'center' }}>
         <div className="card" style={{ padding: '2.5rem', background: 'var(--bg-tertiary)', position: 'relative', minHeight: '350px' }}>
           
           {step > 1 && (
@@ -93,7 +243,10 @@ export default function Home() {
             </button>
           )}
 
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0 0 1rem' }}>Find your pipeline</h2>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', background: 'rgba(37, 99, 235, 0.1)', color: 'var(--brand-primary)', padding: '0.2rem 0.6rem', borderRadius: 'var(--radius-full)', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.75rem' }}>
+            🧬 DNA / Genomics Pipeline Selector
+          </div>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0 0 1rem' }}>Find your recommended workflow</h2>
           
           {/* Step Indicators */}
           <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginBottom: '2rem' }}>
@@ -163,7 +316,7 @@ export default function Home() {
           {/* Step 3: Result */}
           {step === 3 && recommendation && (
             <div style={{ animation: 'fadeIn 0.3s ease' }}>
-              <p style={{ color: 'var(--text-secondary)', margin: '0 0 1rem' }}>Recommended Workflow:</p>
+              <p style={{ color: 'var(--text-secondary)', margin: '0 0 1rem' }}>Recommended Consensus Workflow:</p>
               
               <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem 2rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-full)', border: '1px solid var(--border-subtle)' }}>
@@ -189,9 +342,14 @@ export default function Home() {
                   </div>
                 )}
 
-                <button onClick={() => setShowMapModal(true)} className="btn btn-primary" style={{ marginTop: '1.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', border: 'none', cursor: 'pointer' }}>
-                  View Pipeline on Map <ChevronRight size={16} />
-                </button>
+                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+                  <button onClick={() => setShowMapModal(true)} className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', border: 'none', cursor: 'pointer' }}>
+                    Quick Preview on Map <ChevronRight size={16} />
+                  </button>
+                  <Link to={`/map?tool=${LINES.find(l => l.id === recommendation)?.stops[0]}&material=${material}`} className="btn btn-outline" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                    Open Interactive Map <ArrowRight size={14} />
+                  </Link>
+                </div>
               </div>
             </div>
           )}
@@ -234,7 +392,7 @@ export default function Home() {
       <section style={{ maxWidth: '1200px', margin: '0 auto 5rem' }}>
         <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
           <h2 style={{ fontSize: '1.75rem', fontWeight: 700, letterSpacing: '-0.02em' }}>Pipeline Profiles</h2>
-          <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>Clinical and analytical specifications for each workflow.</p>
+          <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>Clinical and analytical specifications for each DNA mutational workflow.</p>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
@@ -303,7 +461,7 @@ export default function Home() {
             {
               icon: '◉',
               title: 'Tool Stations',
-              desc: 'Every node is a specific software tool. Click any station to see its description, pros/cons, quality criteria, and links to documentation.'
+              desc: 'Every node is a specific software tool. Click any station to see its description, input/output files, pros/cons, quality criteria, and CLI flags.'
             },
             {
               icon: '⊕',
