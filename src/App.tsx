@@ -6,12 +6,10 @@ import Sandbox from './pages/Sandbox';
 import Guides from './pages/Guides';
 import WikiPage from './pages/WikiPage';
 import WikiIndex from './pages/WikiIndex';
-import Discussions from './pages/Discussions';
-import DiscussionDetail from './pages/DiscussionDetail';
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '')}>
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<Home />} />
@@ -20,8 +18,6 @@ export default function App() {
           <Route path="guides" element={<Guides />} />
           <Route path="wiki" element={<WikiIndex />} />
           <Route path="wiki/:pipelineId" element={<WikiPage />} />
-          <Route path="forum" element={<Discussions />} />
-          <Route path="forum/:id" element={<DiscussionDetail />} />
         </Route>
       </Routes>
     </BrowserRouter>

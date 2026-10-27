@@ -1,38 +1,65 @@
-# MutaMetro
+# MetrOmics
 
-A "tube map" style reference for bioinformatics workflows, built for the Task Force Computazionale Bioinfo.
-Pilot scope: DNA mutational analysis.
+A "tube map" reference for bioinformatics workflows, built for the Task Force Computazionale Bioinfo.
+Each pipeline is a coloured line, each tool is a station, and stations shared by several pipelines
+show where the community agrees.
 
-## Status
+**Modules:** DNA (somatic, germline, liquid biopsy, SV/CNV) and RNA (expression, differential
+expression, fusions). Methylation, proteomics and fragmentomics are on the roadmap.
 
-**Draft.** The public reference lines (Sarek, GATK Best Practices) reflect real documentation.
-The "TaskForce Line" is a placeholder — its stops are randomly chosen for now, intersecting with
-the reference lines just to test the interaction model (hover hints, click-through detail, shared
-"interchange" stations). Replace it with the actual lab pipeline in `assets/js/tubemap-data.js`.
+**Status: draft.** The reference lines follow the public documentation of nf-core/sarek,
+nf-core/oncoanalyser, GATK Best Practices, nf-core/rnaseq, nf-core/differentialabundance and
+nf-core/rnafusion. The task force's own pipeline is not on the map yet. Clinical figures marked
+"Not yet assessed by the task force" still need review.
 
-## Structure
+## Running locally
 
-- `index.html` — landing page
-- `tubemap.html` — the interactive tube map (hover = hint, click = detail modal, Simple/Technical toggle)
-- `guides.html` — install guides, external links, practical tips
-- `assets/js/tubemap-data.js` — **edit this file** to change steps, tools, lines, and tool detail content
-- `assets/js/tubemap.js` — rendering engine (shouldn't need changes for content updates)
-- `assets/css/style.css` — design system
+```bash
+npm install
+npm run dev        # live-reload server: http://localhost:5173/wikipage/
+npm run build      # checks the data, type-checks, builds into dist/
+npm run preview    # serves dist/: http://localhost:4173/wikipage/
+```
 
-## Editing the map
+## Pages
 
-Everything content-related lives in `assets/js/tubemap-data.js`:
+| Route | What it is |
+|---|---|
+| `/` | Home: omics selector, pipeline recommender wizard, pipeline profiles |
+| `/map` | Interactive map with DNA/RNA switch, filters and tool details (`?omics=RNA`, `?line=<id>`, `?tool=<id>`) |
+| `/sandbox` | Build a custom DNA pipeline and export a script of reference commands |
+| `/guides` | Install commands and external resources |
+| `/wiki`, `/wiki/<line id>` | Background, publications and examples per pipeline |
 
-- `STEPS` — the columns (macro-steps) of the pipeline, left to right
-- `STATIONS` — every selectable tool at a given step; multiple stations per step = alternative tools
-- `TOOLS` — the hover hint, simple/technical descriptions, pros/cons, and links shown for each tool
-- `LINES` — a pipeline = an ordered list of station ids. Two lines sharing a station at the same
-  step automatically render as a shared "interchange" node (thicker ring).
+Discussions live on [GitHub Discussions](https://github.com/bioinformaticstaskforce/wikipage/discussions).
 
-No build step — it's plain HTML/CSS/JS, so it's directly compatible with GitHub Pages.
+## Editing content
 
-## Deploying to GitHub Pages
+All content is in **`src/data.ts`**. You don't need to touch the components to add tools or pipelines.
 
-1. Push this folder's contents to a GitHub repo (root, or a `/docs` folder).
-2. In the repo settings → Pages, set the source branch (and `/docs` folder if used).
-3. The site will be live at `https://<user>.github.io/<repo>/`.
+- `STEPS`: the columns of each map, left to right, tagged with their omics (`DNA` or `RNA`).
+- `TOOLS`: the tool cards: hint, simple/technical text, pros/cons, recommended command (`params`),
+  input/output files and links.
+- `STATIONS`: places a tool in a step. Each step has at most one `hub` (drawn on the centre row).
+  The others are `branch` stations with a `row` (`-2`, `-1`, `1`, `2`; negative is above the centre).
+  The same tool can appear in several omics through separate stations (e.g. FastQC).
+- `LINES`: a pipeline is an ordered list of station ids plus metadata (status, supported variants,
+  optional clinical profile and wiki content). Stations used by several lines become interchanges.
+
+### Adding the TaskForce line
+
+1. Add any missing tools to `TOOLS` and place them with `STATIONS`.
+2. Add a `Line` to `LINES` with its stops in order, a distinct `color` (hex) and `status: "experimental"`.
+3. Optionally point the wizard to it in `recommendLine()`.
+4. Run `npm run check:data`. It fails on unknown stations or tools, stops from the wrong omics,
+   two hubs in one step, or two stations on the same row.
+
+## Deploying
+
+Every push to `main` deploys to GitHub Pages through `.github/workflows/deploy.yml`.
+
+One-time setup in the repository settings:
+- **Pages → Source:** GitHub Actions.
+- **General → Features:** enable Discussions.
+
+The site is served from `/wikipage/`. If the repository is renamed, update `base` in `vite.config.ts`.

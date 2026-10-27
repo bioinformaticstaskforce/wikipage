@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import SearchBar from './SearchBar';
+import { DISCUSSIONS_URL } from '../data';
 
 export default function Layout() {
   const [isDark, setIsDark] = useState(false);
@@ -26,7 +27,6 @@ export default function Layout() {
     { path: '/sandbox', label: 'Sandbox' },
     { path: '/guides', label: 'Clinical Guides' },
     { path: '/wiki', label: 'Wiki Hub' },
-    { path: '/forum', label: 'Discussions' }
   ];
 
   const isMapRoute = location.pathname === '/map' || location.pathname === '/sandbox';
@@ -62,6 +62,7 @@ export default function Layout() {
                 {link.label}
               </Link>
             ))}
+            <a href={DISCUSSIONS_URL} target="_blank" rel="noreferrer" className="nav-link">Discussions ↗</a>
           </nav>
           
           <button 
@@ -117,6 +118,7 @@ export default function Layout() {
                 {link.label}
               </Link>
             ))}
+            <a href={DISCUSSIONS_URL} target="_blank" rel="noreferrer" className="nav-link">Discussions ↗</a>
           </nav>
         </div>
       )}

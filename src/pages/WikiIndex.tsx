@@ -3,12 +3,6 @@ import { LINES, TOOLS, GLOSSARY } from '../data';
 import GlossaryText from '../components/GlossaryText';
 import GlossaryTooltip from '../components/GlossaryTooltip';
 
-const COLOR_MAP: Record<string, string> = {
-  'var(--line-sarek)': '#059669',
-  'var(--line-gatk)': '#2563eb',
-  'var(--line-onco)': '#dc2626',
-};
-
 export default function WikiIndex() {
   const toolsList = Object.entries(TOOLS).map(([id, tool]) => ({ id, ...tool }));
 
@@ -33,7 +27,7 @@ export default function WikiIndex() {
             {LINES.map(line => (
               <div key={line.id} className="card card-hover" style={{ display: 'flex', flexDirection: 'column' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-                  <div style={{ width: '16px', height: '16px', borderRadius: '50%', background: COLOR_MAP[line.color] || line.color }} />
+                  <div style={{ width: '16px', height: '16px', borderRadius: '50%', background: line.color }} />
                   <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700 }}>{line.name}</h3>
                 </div>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', flex: 1 }}>
@@ -43,7 +37,7 @@ export default function WikiIndex() {
                     'Standard pipeline documentation and references.'
                   )}
                 </p>
-                <Link to={`/wiki/${line.id}`} className="btn btn-primary" style={{ marginTop: '1.5rem', width: '100%', justifyContent: 'center', background: COLOR_MAP[line.color] || line.color }}>
+                <Link to={`/wiki/${line.id}`} className="btn btn-primary" style={{ marginTop: '1.5rem', width: '100%', justifyContent: 'center', background: line.color }}>
                   Explore {line.shortName} Wiki
                 </Link>
               </div>

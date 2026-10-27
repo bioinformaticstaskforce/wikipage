@@ -1,8 +1,44 @@
 import { useState, useMemo } from 'react';
 import TubeMap from '../components/TubeMap';
 import CopyButton from '../components/CopyButton';
-import { STEPS, STATIONS, TOOLS, LINES } from '../data';
+import { STATIONS, TOOLS, stepsFor, linesFor } from '../data';
 import type { Line, Station } from '../data';
+
+const STEPS = stepsFor('DNA');
+const LINES = linesFor('DNA');
+const ORDER = STATIONS.map((s) => s.id);
+
+/* Builds a script from each tool's reference command */
+function generateBash(stops: string[], date = new Date().toISOString().split('T')[0]) {
+  const tools = stops
+    .map((id) => STATIONS.find((s) => s.id === id))
+    .filter((st): st is Station => !!st && st.stepId !== 'input')
+    .map((st) => TOOLS[st.toolId]);
+
+  const body = tools.map((t, i) => {
+    const cmd = t.params
+      ? t.params.replace(/ && /g, '\n')
+      : `# No standalone command: ${t.name} runs inside its pipeline.\n# See ${t.links[0]?.url ?? 'the tool documentation'}`;
+    return `# ── Step ${i + 1}/${tools.length}: ${t.name}\necho "  [${i + 1}/${tools.length}] ${t.name}"\n${cmd}\n`;
+  }).join('\n');
+
+  return `#!/bin/bash
+# ──────────────────────────────────────────────
+# MetrOmics Generated Pipeline
+# Generated: ${date}
+# Reference commands only: file names are not chained
+# between steps, adjust inputs/outputs before running.
+# ──────────────────────────────────────────────
+
+set -euo pipefail
+
+SAMPLE_ID="\${1:?Usage: $0 <sample_id>}"
+echo "▶ Starting analysis for \${SAMPLE_ID}"
+
+${body}
+echo "✓ Pipeline complete for \${SAMPLE_ID}"
+`;
+}
 
 export default function Sandbox() {
   const [userStops, setUserStops] = useState<string[]>(LINES[0].stops);
@@ -14,7 +50,7 @@ export default function Sandbox() {
       id: 'l_custom',
       name: 'Custom Pipeline',
       shortName: 'Custom',
-      color: '#f59e0b',
+      color: '#db2777',
       stops: userStops,
       status: 'experimental',
       scope: 'exploratory',
@@ -24,43 +60,17 @@ export default function Sandbox() {
     return [...LINES, customLine];
   }, [userStops]);
 
-  const handleStationSelect = (stepIndex: number, stationId: string) => {
-    const newStops = [...userStops];
-    newStops[stepIndex] = stationId;
-    setUserStops(newStops);
+  const toggleStation = (stationId: string) => {
+    setUserStops((prev) => prev.includes(stationId)
+      ? prev.filter((id) => id !== stationId)
+      : [...prev, stationId].sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b)));
   };
 
   const handleStationClick = (station: Station, lineIds: string[]) => {
     setSelectedStation({ station, lineIds });
   };
 
-  const generateBash = () => {
-    const tools = userStops.map((id) => {
-      const st = STATIONS.find((s) => s.id === id);
-      return st ? TOOLS[st.toolId].name : '';
-    }).filter(Boolean);
-
-    return `#!/bin/bash
-# ──────────────────────────────────────────────
-# MetrOmics Generated Pipeline
-# Generated: ${new Date().toISOString().split('T')[0]}
-# ──────────────────────────────────────────────
-
-set -euo pipefail
-
-SAMPLE_ID="\${1:?Usage: $0 <sample_id>}"
-REF="GRCh38.fa"
-THREADS=8
-
-echo "▶ Starting analysis for \${SAMPLE_ID}"
-
-${tools.map((t, i) => `# Step ${i + 1}: ${t}
-echo "  [${i + 1}/${tools.length}] Running ${t}..."
-# TODO: Insert ${t} command here
-`).join('\n')}
-echo "✓ Pipeline complete for \${SAMPLE_ID}"
-`;
-  };
+  const script = generateBash(userStops);
 
   return (
     <div>
@@ -70,7 +80,7 @@ echo "✓ Pipeline complete for \${SAMPLE_ID}"
             Pipeline Sandbox
           </h1>
           <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.9rem' }}>
-            Build a custom pipeline by selecting tools for each step, then export as a script.
+            Toggle tools on or off for each step, then export as a script.
           </p>
         </div>
         <button onClick={() => setShowExport(true)} className="btn btn-primary">
@@ -81,9 +91,9 @@ echo "✓ Pipeline complete for \${SAMPLE_ID}"
       <div style={{ display: 'flex', gap: '1.5rem', flexDirection: 'column' }}>
         {/* Builder */}
         <div className="card" style={{ padding: '1.25rem' }}>
-          <p className="section-label" style={{ marginTop: 0, marginBottom: '1rem' }}>Select a tool for each step</p>
+          <p className="section-label" style={{ marginTop: 0, marginBottom: '1rem' }}>Select tools (click again to remove)</p>
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-            {STEPS.map((step, i) => {
+            {STEPS.map((step) => {
               const stepStations = STATIONS.filter((s) => s.stepId === step.id);
               if (stepStations.length === 0) return null;
               return (
@@ -93,11 +103,11 @@ echo "✓ Pipeline complete for \${SAMPLE_ID}"
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
                     {stepStations.map((s) => {
-                      const isActive = userStops[i] === s.id;
+                      const isActive = userStops.includes(s.id);
                       return (
                         <button
                           key={s.id}
-                          onClick={() => handleStationSelect(i, s.id)}
+                          onClick={() => toggleStation(s.id)}
                           style={{
                             textAlign: 'left',
                             padding: '0.4rem 0.7rem',
@@ -129,7 +139,7 @@ echo "✓ Pipeline complete for \${SAMPLE_ID}"
             <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginRight: '0.5rem', alignSelf: 'center' }}>Legend:</span>
             {activeLines.map((line) => (
               <div key={line.id} className="legend-item" style={{ opacity: line.id === 'l_custom' ? 1 : 0.4 }}>
-                <span className="legend-dot" style={{ background: line.color.startsWith('var') ? (line.color === 'var(--line-sarek)' ? '#059669' : line.color === 'var(--line-gatk)' ? '#2563eb' : '#dc2626') : line.color }} />
+                <span className="legend-dot" style={{ background: line.color }} />
                 {line.shortName}
               </div>
             ))}
@@ -171,15 +181,15 @@ echo "✓ Pipeline complete for \${SAMPLE_ID}"
               borderRadius: 'var(--radius-md)', overflowX: 'auto', fontSize: '0.78rem',
               fontFamily: 'var(--font-mono)', lineHeight: 1.6
             }}>
-              <code>{generateBash()}</code>
+              <code>{script}</code>
             </pre>
             <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem', width: '100%' }}>
               <div style={{ flex: 1 }}>
-                <CopyButton text={generateBash()} />
+                <CopyButton text={script} />
               </div>
               <button
                 onClick={() => {
-                  const blob = new Blob([generateBash()], { type: 'text/plain' });
+                  const blob = new Blob([script], { type: 'text/plain' });
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement('a');
                   a.href = url;

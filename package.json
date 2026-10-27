@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "npm run check:data && tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check:data": "node --experimental-strip-types scripts/check-data.ts"
   },
   "dependencies": {
     "lucide-react": "^1.33.0",

@@ -5,38 +5,26 @@ import GlossaryText from '../components/GlossaryText';
 import Badge from '../components/Badge';
 import CompareTable from '../components/CompareTable';
 import TubeMap from '../components/TubeMap';
-import { LINES, SITE_TAGLINE, OMICS_CATEGORIES } from '../data';
+import { LINES, SITE_TAGLINE, OMICS_CATEGORIES, DISCUSSIONS_URL, linesFor, recommendLine } from '../data';
 import type { OmicsCategory } from '../data';
 
-const COLOR_MAP: Record<string, string> = {
-  'var(--line-sarek)': '#059669',
-  'var(--line-gatk)': '#2563eb',
-  'var(--line-onco)': '#dc2626',
-};
-
 const ROADMAP_DETAILS: Record<string, { plannedPipelines: string[]; technologies: string[]; quarter: string; focus: string }> = {
-  RNA: {
-    plannedPipelines: ['nf-core/rnaseq', 'STAR-Fusion', 'Arriba', 'Salmon / DESeq2'],
-    technologies: ['Illumina NovaSeq', 'PacBio Iso-Seq (Full-Length)', 'Oxford Nanopore Direct RNA'],
-    quarter: 'Q1 2026',
-    focus: 'Transcript quantification, alternative splicing, gene fusion detection, and clinical expression profiling.'
-  },
   Methylation: {
     plannedPipelines: ['nf-core/methylseq', 'Bismark', 'bwa-meth', 'MethylDackel'],
     technologies: ['Whole-Genome Bisulfite (WGBS)', 'Enzymatic Methyl-seq (EM-seq)', 'Nanopore 5mC/5hmC direct calling'],
-    quarter: 'Q2 2026',
+    quarter: 'TBD',
     focus: 'CpG island methylation, differential methylation regions (DMRs), and epigenetic biomarker discovery.'
   },
   Proteomics: {
     plannedPipelines: ['nf-core/proteomicslfq', 'MaxQuant', 'FragPipe / MSFragger', 'DIA-NN'],
     technologies: ['DDA Orbitrap', 'DIA timsTOF (Bruker)', 'TMT Isobaric Multiplexing'],
-    quarter: 'Q2 2026',
+    quarter: 'TBD',
     focus: 'High-throughput protein identification, label-free quantification (LFQ), and post-translational modifications (PTMs).'
   },
   Fragmentomics: {
     plannedPipelines: ['Griffin nucleosome profiler', 'ICHOR-CNA', 'WisecondorX', 'Fragment size ratio callers'],
     technologies: ['cfDNA ultra-deep sequencing', 'Targeted cancer liquid biopsy assays'],
-    quarter: 'Q3 2026',
+    quarter: 'TBD',
     focus: 'Cell-free DNA fragment size distribution, end-motif profiling, and tissue-of-origin deconvolution.'
   }
 };
@@ -55,14 +43,8 @@ export default function Home() {
     setMaterial('');
   };
 
-  const getRecommendation = () => {
-    if (variantType === 'somatic') return 'l_sarek';
-    if (variantType === 'germline') return 'l_gatk';
-    if (variantType === 'comprehensive') return 'l_onco';
-    return '';
-  };
-
-  const recommendation = getRecommendation();
+  const recommendation = recommendLine(variantType, material);
+  const recLine = LINES.find(l => l.id === recommendation);
 
   useEffect(() => {
     if (showMapModal) {
@@ -130,14 +112,14 @@ export default function Home() {
               <div
                 key={cat.id}
                 className={`omics-card ${isSelected ? 'active' : ''} ${!cat.available ? 'disabled' : ''}`}
-                onClick={() => setSelectedOmics(cat.id)}
+                onClick={() => cat.available && cat.id !== 'DNA' ? navigate(`/map?omics=${cat.id}`) : setSelectedOmics(cat.id)}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
                   <span style={{ fontSize: '2rem' }}>{cat.icon}</span>
                   {cat.available ? (
                     <span className="omics-badge-active">
                       <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#059669' }} />
-                      Active (3 Lines)
+                      Active ({linesFor(cat.id).length} Lines)
                     </span>
                   ) : (
                     <span className="omics-badge-roadmap">
@@ -222,9 +204,9 @@ export default function Home() {
               <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                 Have specific tool or benchmarking recommendations for this module?
               </span>
-              <Link to="/forum" className="btn btn-outline" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
+              <a href={DISCUSSIONS_URL} target="_blank" rel="noreferrer" className="btn btn-outline" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
                 <MessageSquare size={14} /> Join Discussion & Propose Tools
-              </Link>
+              </a>
             </div>
           </div>
         )}
@@ -320,8 +302,8 @@ export default function Home() {
               
               <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem 2rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-full)', border: '1px solid var(--border-subtle)' }}>
-                  <span className="legend-dot" style={{ background: COLOR_MAP[LINES.find(l => l.id === recommendation)?.color || ''] }} />
-                  <span style={{ fontWeight: 800, fontSize: '1.3rem' }}>{LINES.find(l => l.id === recommendation)?.name}</span>
+                  <span className="legend-dot" style={{ background: recLine?.color }} />
+                  <span style={{ fontWeight: 800, fontSize: '1.3rem' }}>{recLine?.name}</span>
                 </div>
 
                 {material === 'ffpe' && (
@@ -346,7 +328,7 @@ export default function Home() {
                   <button onClick={() => setShowMapModal(true)} className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', border: 'none', cursor: 'pointer' }}>
                     Quick Preview on Map <ChevronRight size={16} />
                   </button>
-                  <Link to={`/map?tool=${LINES.find(l => l.id === recommendation)?.stops[0]}&material=${material}`} className="btn btn-outline" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Link to={`/map?line=${recommendation}&material=${material}`} className="btn btn-outline" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
                     Open Interactive Map <ArrowRight size={14} />
                   </Link>
                 </div>
@@ -363,7 +345,7 @@ export default function Home() {
           <div className="card" style={{ width: '95%', height: '90%', padding: '1rem', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', padding: '0 1rem' }}>
               <div>
-                <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>{LINES.find(l => l.id === recommendation)?.name} Pipeline</h2>
+                <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>{recLine?.name} Pipeline</h2>
                 <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Interactive view of the suggested workflow</p>
               </div>
               <button onClick={() => setShowMapModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
@@ -373,14 +355,14 @@ export default function Home() {
             
             <div style={{ flex: 1, position: 'relative', background: 'var(--bg-primary)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
               <TubeMap 
-                activeLines={LINES}
+                activeLines={linesFor('DNA')}
                 highlightedLineId={recommendation} 
                 onStationClick={(station) => navigate(`/map?tool=${station.toolId}&material=${material}`)}
               />
             </div>
             
             <div style={{ padding: '1rem', textAlign: 'right' }}>
-              <Link to={`/map?tool=${LINES.find(l => l.id === recommendation)?.stops[0]}&material=${material}`} className="btn btn-outline" style={{ display: 'inline-flex', alignItems: 'center' }}>
+              <Link to={`/map?line=${recommendation}&material=${material}`} className="btn btn-outline" style={{ display: 'inline-flex', alignItems: 'center' }}>
                 Open Full Map Experience
               </Link>
             </div>
@@ -392,12 +374,12 @@ export default function Home() {
       <section style={{ maxWidth: '1200px', margin: '0 auto 5rem' }}>
         <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
           <h2 style={{ fontSize: '1.75rem', fontWeight: 700, letterSpacing: '-0.02em' }}>Pipeline Profiles</h2>
-          <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>Clinical and analytical specifications for each DNA mutational workflow.</p>
+          <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>Clinical and analytical specifications for each workflow. Profiles without figures are pending task-force review.</p>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
           {LINES.map(line => (
-            <div key={line.id} className="card" style={{ borderTop: `4px solid ${COLOR_MAP[line.color] || line.color}` }}>
+            <div key={line.id} className="card" style={{ borderTop: `4px solid ${line.color}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                 <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>{line.name}</h3>
                 <Badge 
@@ -431,12 +413,12 @@ export default function Home() {
                       <strong>Note:</strong> <GlossaryText text={line.clinical.accreditation} />
                     </div>
                   )}
-                  {line.wiki && (
-                    <Link to={`/wiki/${line.id}`} className="btn btn-outline" style={{ marginTop: '0.5rem', width: '100%', justifyContent: 'center', borderColor: COLOR_MAP[line.color] || line.color, color: COLOR_MAP[line.color] || line.color }}>
-                      View {line.shortName} Wiki ↗
-                    </Link>
-                  )}
                 </div>
+              )}
+              {line.wiki && (
+                <Link to={`/wiki/${line.id}`} className="btn btn-outline" style={{ marginTop: '0.5rem', width: '100%', justifyContent: 'center', borderColor: line.color, color: line.color }}>
+                  View {line.shortName} Wiki ↗
+                </Link>
               )}
             </div>
           ))}

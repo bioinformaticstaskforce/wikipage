@@ -1,6 +1,6 @@
 import { useMemo, useState, useRef } from 'react';
-import { STEPS, STATIONS, TOOLS } from '../data';
-import type { Line, Station } from '../data';
+import { STATIONS, TOOLS, stepsFor } from '../data';
+import type { Line, Station, Step } from '../data';
 
 /* Layout constants */
 const COL_W = 180;
@@ -13,21 +13,15 @@ const LINE_W = 8;
 const HUB_R = 13;
 const TICK_R = 7;
 
-/* Inline color map — CSS vars don't resolve in SVG attributes consistently */
-const COLOR_MAP: Record<string, string> = {
-  'var(--line-sarek)': '#059669',
-  'var(--line-gatk)': '#2563eb',
-  'var(--line-onco)': '#dc2626',
-};
-function resolveColor(c: string) { return COLOR_MAP[c] ?? c; }
-
 interface Pos { x: number; y: number }
 
 export default function TubeMap({
   activeLines = [],
   highlightedLineId = null,
   onStationClick,
+  steps = stepsFor('DNA'),
 }: {
+  steps?: Step[];
   activeLines?: Line[];
   highlightedLineId?: string | null;
   onStationClick?: (station: Station, lineIds: string[]) => void;
@@ -52,7 +46,7 @@ export default function TubeMap({
       });
     });
 
-    STEPS.forEach((step, colIdx) => {
+    steps.forEach((step, colIdx) => {
       const x = MARGIN_L + colIdx * COL_W;
       const inStep = STATIONS.filter((s) => s.stepId === step.id);
 
@@ -63,9 +57,8 @@ export default function TubeMap({
       hubs.forEach((s) => { pos[s.id] = { x, y: CENTER_Y }; });
 
       branches.forEach((s, i) => {
-        const direction = i % 2 === 0 ? -1 : 1;
-        const tier = Math.floor(i / 2) + 1;
-        pos[s.id] = { x, y: CENTER_Y + direction * tier * ROW_H };
+        const row = s.row ?? (i % 2 === 0 ? -1 : 1) * (Math.floor(i / 2) + 1);
+        pos[s.id] = { x, y: CENTER_Y + row * ROW_H };
       });
     });
 
@@ -90,10 +83,10 @@ export default function TubeMap({
     });
 
     return { stationPos: pos, stationLines: slines, segCount: sCount, segRank: sRank };
-  }, [activeLines]);
+  }, [activeLines, steps]);
 
   /* ── Zoom and Pan State ───────────────────────────── */
-  const svgWidth = MARGIN_L + STEPS.length * COL_W + 40;
+  const svgWidth = MARGIN_L + steps.length * COL_W + 40;
   const [viewBox, setViewBox] = useState({ x: 0, y: 0, w: svgWidth, h: SVG_H });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
@@ -173,7 +166,7 @@ export default function TubeMap({
         <rect width="100%" height="100%" fill="url(#grid)" rx="10" />
 
         {/* Column guides + step labels */}
-        {STEPS.map((step, i) => {
+        {steps.map((step, i) => {
           const x = MARGIN_L + i * COL_W;
           return (
             <g key={step.id}>
@@ -189,7 +182,7 @@ export default function TubeMap({
         {activeLines.map((line) => {
           const stops = line.stops;
           const isFaded = effectiveHighlight !== null && effectiveHighlight !== line.id;
-          const color = resolveColor(line.color);
+          const color = line.color;
 
           return (
             <g
@@ -250,11 +243,11 @@ export default function TubeMap({
           if (!pos) return null;
           const tool = TOOLS[station.toolId];
           const isHub = station.type === 'hub' || lines.length > 1;
-          const primaryColor = resolveColor(activeLines.find((l) => l.id === lines[0])?.color || '#94a3b8');
+          const primaryColor = activeLines.find((l) => l.id === lines[0])?.color || '#94a3b8';
           const isFaded = effectiveHighlight !== null && !lines.includes(effectiveHighlight);
 
-          /* Label goes above if the station is above center, below otherwise */
-          const labelY = pos.y <= CENTER_Y ? -22 : 24;
+          /* Above-centre labels go above; hub labels drop below the bundle of parallel lines */
+          const labelY = pos.y < CENTER_Y ? -22 : pos.y === CENTER_Y ? 42 : 24;
 
           return (
             <g

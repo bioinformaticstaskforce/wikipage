@@ -3,12 +3,6 @@ import ReactMarkdown from 'react-markdown';
 import { LINES } from '../data';
 import GlossaryText from '../components/GlossaryText';
 
-const COLOR_MAP: Record<string, string> = {
-  'var(--line-sarek)': '#059669',
-  'var(--line-gatk)': '#2563eb',
-  'var(--line-onco)': '#dc2626',
-};
-
 export default function WikiPage() {
   const { pipelineId } = useParams<{ pipelineId: string }>();
   const line = LINES.find(l => l.id === pipelineId);
@@ -26,7 +20,7 @@ export default function WikiPage() {
 
   return (
     <div style={{ maxWidth: '900px', margin: '0 auto', paddingBottom: '4rem' }}>
-      <div style={{ marginBottom: '2.5rem', borderBottom: `4px solid ${COLOR_MAP[line.color] || line.color}`, paddingBottom: '1rem' }}>
+      <div style={{ marginBottom: '2.5rem', borderBottom: `4px solid ${line.color}`, paddingBottom: '1rem' }}>
         <h1 style={{ fontSize: '2.5rem', fontWeight: 800, margin: '0 0 0.5rem', letterSpacing: '-0.02em' }}>
           {line.name} <span style={{ color: 'var(--text-muted)', fontWeight: 300 }}>Wiki</span>
         </h1>
@@ -64,7 +58,7 @@ export default function WikiPage() {
           <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0 0 1rem' }}>Examples & Resources</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {wiki.examples.map((ex, i) => (
-              <div key={i} style={{ padding: '1rem', borderLeft: `3px solid ${COLOR_MAP[line.color] || line.color}`, background: 'var(--bg-tertiary)' }}>
+              <div key={i} style={{ padding: '1rem', borderLeft: `3px solid ${line.color}`, background: 'var(--bg-tertiary)' }}>
                 <h3 style={{ fontSize: '1.05rem', fontWeight: 600, margin: '0 0 0.25rem' }}>{ex.title}</h3>
                 <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.95rem' }}>
                   <GlossaryText text={ex.desc} />
