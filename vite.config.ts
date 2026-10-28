@@ -4,6 +4,6 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  // GitHub Pages serves the site from /<repo>/ — change this if the repo is renamed
-  base: '/wikipage/',
+  // '/' for Vercel and local; the GitHub Pages workflow sets BASE_PATH=/wikipage/
+  base: process.env.BASE_PATH || '/',
 })
