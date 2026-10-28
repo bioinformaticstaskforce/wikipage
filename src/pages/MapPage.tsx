@@ -4,21 +4,38 @@ import { AlertTriangle } from 'lucide-react';
 import TubeMap from '../components/TubeMap';
 import GlossaryText from '../components/GlossaryText';
 import CopyButton from '../components/CopyButton';
-import { TOOLS, LINES, STEPS, STATIONS } from '../data';
-import type { Station, VariantType } from '../data';
+import { TOOLS, LINES, STEPS, STATIONS, stepsFor, linesFor, recommendLine } from '../data';
+import type { OmicsCategory, Station, VariantType } from '../data';
 
-const COLOR_MAP: Record<string, string> = {
-  'var(--line-sarek)': '#059669',
-  'var(--line-gatk)': '#2563eb',
-  'var(--line-onco)': '#dc2626',
+const VARIANT_FILTERS: Record<string, (VariantType | 'All')[]> = {
+  DNA: ['All', 'SNV', 'Indel', 'CNV', 'SV'],
+  RNA: ['All', 'Expression', 'RNA Fusion'],
 };
 
+const omicsOfStation = (st?: Station) => STEPS.find((s) => s.id === st?.stepId)?.omics;
+
+function getFormatBadgeClass(format: string): string {
+  const f = format.toLowerCase();
+  if (f.includes('fastq')) return 'file-pill file-pill-fastq';
+  if (f.includes('bam') || f.includes('cram') || f.includes('bai')) return 'file-pill file-pill-bam';
+  if (f.includes('vcf')) return 'file-pill file-pill-vcf';
+  if (f.includes('table') || f.includes('tsv') || f.includes('txt') || f.includes('json')) return 'file-pill file-pill-table';
+  if (f.includes('html')) return 'file-pill file-pill-html';
+  return 'file-pill file-pill-dir';
+}
+
 export default function MapPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const materialParam = searchParams.get('material');
+  const toolStation = STATIONS.find((s) => s.toolId === searchParams.get('tool'));
+  const lineParam = LINES.find((l) => l.id === searchParams.get('line'));
+  const omics: OmicsCategory = (searchParams.get('omics') as OmicsCategory | null)
+    ?? lineParam?.omicsCategory ?? omicsOfStation(toolStation) ?? 'DNA';
+  const omicsLines = linesFor(omics);
   const [selectedStation, setSelectedStation] = useState<{ station: Station; lineIds: string[] } | null>(null);
   const [activeVariantFilter, setActiveVariantFilter] = useState<VariantType | 'All'>('All');
-  const [highlightedLineId, setHighlightedLineId] = useState<string | null>(null);
+  const [technologyFilter, setTechnologyFilter] = useState<string>('All');
+  const [highlightedLineId, setHighlightedLineId] = useState<string | null>(lineParam?.id ?? null);
 
   // Recommender State
   const [recommenderGoal, setRecommenderGoal] = useState<string>('');
@@ -26,24 +43,24 @@ export default function MapPage() {
 
   // Auto-highlight based on recommender goal
   useEffect(() => {
-    if (recommenderGoal === 'somatic') setHighlightedLineId('l_sarek');
-    else if (recommenderGoal === 'germline') setHighlightedLineId('l_gatk');
-    else if (recommenderGoal === 'comprehensive') setHighlightedLineId('l_onco');
-  }, [recommenderGoal]);
+    const rec = recommendLine(recommenderGoal, recommenderMaterial);
+    if (rec) setHighlightedLineId(rec);
+  }, [recommenderGoal, recommenderMaterial]);
 
   // Auto-select tool if URL parameter exists
   useEffect(() => {
-    const toolParam = searchParams.get('tool');
-    if (toolParam) {
-      // Find a station that uses this tool
-      const targetStation = STATIONS.find(s => s.toolId === toolParam);
-      if (targetStation) {
-        // Find lines that stop at this station
-        const lineIds = LINES.filter(l => l.stops.includes(targetStation.id)).map(l => l.id);
-        setSelectedStation({ station: targetStation, lineIds });
-      }
+    if (toolStation) {
+      const lineIds = LINES.filter(l => l.stops.includes(toolStation.id)).map(l => l.id);
+      setSelectedStation({ station: toolStation, lineIds });
     }
-  }, [searchParams]);
+  }, [toolStation]);
+
+  const switchOmics = (o: OmicsCategory) => {
+    setSearchParams({ omics: o });
+    setSelectedStation(null);
+    setHighlightedLineId(null);
+    setActiveVariantFilter('All');
+  };
 
   const handleStationClick = (station: Station, lineIds: string[]) => {
     setSelectedStation({ station, lineIds });
@@ -52,27 +69,37 @@ export default function MapPage() {
   const selectedTool = selectedStation ? TOOLS[selectedStation.station.toolId] : null;
   const selectedStep = selectedStation ? STEPS.find((s) => s.id === selectedStation.station.stepId) : null;
   
-  const filteredLines = activeVariantFilter === 'All' 
-    ? LINES 
-    : LINES.filter(line => line.supportedVariants.includes(activeVariantFilter));
+  const filteredLines = omicsLines.filter(line => {
+    const matchesVariant = activeVariantFilter === 'All' || line.supportedVariants.includes(activeVariantFilter);
+    const matchesTech = technologyFilter === 'All' || line.technology === technologyFilter;
+    return matchesVariant && matchesTech;
+  });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '1.5rem', boxSizing: 'border-box' }}>
       {/* Header row */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '1rem', flexShrink: 0, flexWrap: 'wrap', gap: '1rem' }}>
         <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+            {(['DNA', 'RNA'] as const).map(o => (
+              <button key={o} onClick={() => switchOmics(o)} className={omics === o ? 'omics-badge-active' : 'omics-badge-roadmap'} style={{ cursor: 'pointer', border: 'none' }}>
+                {o === 'DNA' ? '🧬 DNA / Genomics' : '📝 RNA / Transcriptomics'}
+              </button>
+            ))}
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Illumina Short-Read Consensus</span>
+          </div>
           <h1 style={{ fontSize: '1.75rem', fontWeight: 800, margin: '0 0 0.25rem', letterSpacing: '-0.02em' }}>
             Interactive Pipeline Map
           </h1>
           <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.9rem' }}>
-            Click any station to view tool details.
+            Click any station to view tool rationale, I/O file flow, and parameter recommendations.
           </p>
         </div>
         
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', alignItems: 'flex-end' }}>
           
-          {/* Recommender Dropdowns */}
-          <div style={{ display: 'flex', gap: '0.5rem', background: 'var(--bg-secondary)', padding: '0.4rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--brand-primary)', boxShadow: '0 0 0 1px rgba(var(--brand-primary-rgb), 0.2)' }}>
+          {/* Recommender & Platform Dropdowns */}
+          {omics === 'DNA' && <div style={{ display: 'flex', gap: '0.5rem', background: 'var(--bg-secondary)', padding: '0.4rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--brand-primary)', boxShadow: '0 0 0 1px rgba(var(--brand-primary-rgb), 0.2)', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--brand-primary)', alignSelf: 'center', marginLeft: '0.25rem' }}>Suggest:</span>
             <select 
               value={recommenderGoal} 
@@ -95,11 +122,23 @@ export default function MapPage() {
               <option value="ffpe">FFPE Tissue</option>
               <option value="cfdna">Liquid Biopsy (cfDNA)</option>
             </select>
-          </div>
+
+            <select 
+              value={technologyFilter} 
+              onChange={(e) => setTechnologyFilter(e.target.value)}
+              style={{ padding: '0.25rem 0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '0.8rem', outline: 'none' }}
+              title="Filter by sequencing technology / platform"
+            >
+              <option value="All">Platform: All</option>
+              <option value="Illumina">Illumina (Short-Read)</option>
+              <option value="Nanopore" disabled>Nanopore (Roadmap)</option>
+              <option value="PacBio" disabled>PacBio HiFi (Roadmap)</option>
+            </select>
+          </div>}
 
           {/* Variant Filter */}
           <div style={{ display: 'flex', gap: '0.25rem', background: 'var(--bg-secondary)', padding: '0.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-            {(['All', 'SNV', 'Indel', 'CNV', 'SV', 'RNA Fusion'] as const).map(v => (
+            {VARIANT_FILTERS[omics].map(v => (
               <button
                 key={v}
                 onClick={() => setActiveVariantFilter(v)}
@@ -118,7 +157,7 @@ export default function MapPage() {
           {/* Legend */}
           <div className="legend" style={{ marginBottom: 0, gap: '0.25rem' }}>
             <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginRight: '0.5rem', alignSelf: 'center' }}>Legend:</span>
-            {LINES.map((line) => {
+            {omicsLines.map((line) => {
               const isFilteredOut = activeVariantFilter !== 'All' && !line.supportedVariants.includes(activeVariantFilter as VariantType);
               const isActive = highlightedLineId === line.id;
               
@@ -135,7 +174,7 @@ export default function MapPage() {
                     border: isActive ? '1px solid var(--border-color)' : '1px solid transparent'
                   }}
                 >
-                  <span className="legend-dot" style={{ background: COLOR_MAP[line.color] || line.color }} />
+                  <span className="legend-dot" style={{ background: line.color }} />
                   {line.shortName}
                 </button>
               );
@@ -146,7 +185,7 @@ export default function MapPage() {
 
       {/* Split layout */}
       {/* Material Context Warnings */}
-      {recommenderMaterial === 'ffpe' && (
+      {omics === 'DNA' && recommenderMaterial === 'ffpe' && (
         <div style={{ marginBottom: '1.5rem', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid #f59e0b', padding: '1rem', borderRadius: 'var(--radius-md)', display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
           <AlertTriangle color="#f59e0b" size={20} style={{ flexShrink: 0 }} />
           <div style={{ fontSize: '0.9rem', color: 'var(--text-primary)', lineHeight: 1.5 }}>
@@ -155,11 +194,11 @@ export default function MapPage() {
         </div>
       )}
 
-      {recommenderMaterial === 'cfdna' && (
+      {omics === 'DNA' && recommenderMaterial === 'cfdna' && (
         <div style={{ marginBottom: '1.5rem', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid #3b82f6', padding: '1rem', borderRadius: 'var(--radius-md)', display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
           <AlertTriangle color="#3b82f6" size={20} style={{ flexShrink: 0 }} />
           <div style={{ fontSize: '0.9rem', color: 'var(--text-primary)', lineHeight: 1.5 }}>
-            <strong>Liquid Biopsy Context:</strong> You selected a cfDNA context. cfDNA requires ultra-deep sequencing and mandatory UMI deduplication.
+            <strong>Liquid Biopsy Context:</strong> You selected a cfDNA context. cfDNA requires ultra-deep sequencing and mandatory UMI consensus calling — see the Sarek UMI line (fgbio).
           </div>
         </div>
       )}
@@ -177,6 +216,8 @@ export default function MapPage() {
           boxShadow: 'var(--shadow-sm)'
         }}>
           <TubeMap 
+            key={omics}
+            steps={stepsFor(omics)}
             onStationClick={handleStationClick} 
             activeLines={filteredLines} 
             highlightedLineId={highlightedLineId} 
@@ -214,7 +255,7 @@ export default function MapPage() {
                   const line = LINES.find((l) => l.id === id);
                   if (!line) return null;
                   return (
-                    <span key={id} className="tag" style={{ background: COLOR_MAP[line.color] || line.color }}>
+                    <span key={id} className="tag" style={{ background: line.color }}>
                       {line.shortName}
                     </span>
                   );
@@ -233,6 +274,63 @@ export default function MapPage() {
                   <GlossaryText text={selectedTool.technical} />
                 </p>
               </div>
+
+              {/* Data Flow (Input & Output Files) */}
+              {((selectedTool.inputFiles && selectedTool.inputFiles.length > 0) || 
+                (selectedTool.outputFiles && selectedTool.outputFiles.length > 0)) && (
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                    <p className="section-label" style={{ margin: 0 }}>Data Flow & File I/O</p>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Input → Output</span>
+                  </div>
+
+                  <div className="file-io-box">
+                    {/* Input Files */}
+                    {selectedTool.inputFiles && selectedTool.inputFiles.length > 0 && (
+                      <div style={{ marginBottom: selectedTool.outputFiles?.length ? '0.75rem' : 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', fontWeight: 700, color: '#2563eb', marginBottom: '0.35rem' }}>
+                          <span>📥 Input Files</span>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                          {selectedTool.inputFiles.map((f, i) => (
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-secondary)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)' }}>{f.name}</span>
+                                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{f.description}</span>
+                              </div>
+                              <span className={getFormatBadgeClass(f.format)} style={{ flexShrink: 0, marginLeft: '0.5rem' }}>
+                                {f.format}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Output Files */}
+                    {selectedTool.outputFiles && selectedTool.outputFiles.length > 0 && (
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', fontWeight: 700, color: '#059669', marginBottom: '0.35rem' }}>
+                          <span>📤 Output Files</span>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                          {selectedTool.outputFiles.map((f, i) => (
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-secondary)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)' }}>{f.name}</span>
+                                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{f.description}</span>
+                              </div>
+                              <span className={getFormatBadgeClass(f.format)} style={{ flexShrink: 0, marginLeft: '0.5rem' }}>
+                                {f.format}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Recommended Parameters */}
               {selectedTool.params && (

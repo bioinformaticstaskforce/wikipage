@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import SearchBar from './SearchBar';
+import { DISCUSSIONS_URL } from '../data';
 
 export default function Layout() {
   const [isDark, setIsDark] = useState(false);
@@ -26,7 +27,6 @@ export default function Layout() {
     { path: '/sandbox', label: 'Sandbox' },
     { path: '/guides', label: 'Clinical Guides' },
     { path: '/wiki', label: 'Wiki Hub' },
-    { path: '/forum', label: 'Discussions' }
   ];
 
   const isMapRoute = location.pathname === '/map' || location.pathname === '/sandbox';
@@ -50,7 +50,7 @@ export default function Layout() {
             <line x1="9" y1="11" x2="18" y2="11" stroke="#334155" strokeWidth="1.5" />
             <line x1="18" y1="11" x2="14" y2="19" stroke="#334155" strokeWidth="1.5" />
           </svg>
-          <span style={{ fontSize: '1.1rem', fontWeight: 700, letterSpacing: '-0.02em' }}>MutaMetro</span>
+          <span style={{ fontSize: '1.1rem', fontWeight: 700, letterSpacing: '-0.02em' }}>MetrOmics</span>
         </Link>
 
         {/* Desktop Nav */}
@@ -62,6 +62,7 @@ export default function Layout() {
                 {link.label}
               </Link>
             ))}
+            <a href={DISCUSSIONS_URL} target="_blank" rel="noreferrer" className="nav-link">Discussions ↗</a>
           </nav>
           
           <button 
@@ -117,6 +118,7 @@ export default function Layout() {
                 {link.label}
               </Link>
             ))}
+            <a href={DISCUSSIONS_URL} target="_blank" rel="noreferrer" className="nav-link">Discussions ↗</a>
           </nav>
         </div>
       )}
@@ -129,7 +131,7 @@ export default function Layout() {
 
       {!isMapRoute && (
         <footer style={{ borderTop: '1px solid var(--border-subtle)', padding: '1.5rem 2rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', flexShrink: 0 }}>
-          <p style={{ margin: 0 }}>MutaMetro — Working Draft · Task Force Computazionale Bioinfo · September 2025</p>
+          <p style={{ margin: 0 }}>MetrOmics — Multi-Omic Analysis Workflows · Task Force Computazionale Bioinfo</p>
         </footer>
       )}
     </div>
