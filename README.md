@@ -16,9 +16,9 @@ nf-core/rnafusion. The task force's own pipeline is not on the map yet. Clinical
 
 ```bash
 npm install
-npm run dev        # live-reload server: http://localhost:5173/wikipage/
+npm run dev        # live-reload server: http://localhost:5173/
 npm run build      # checks the data, type-checks, builds into dist/
-npm run preview    # serves dist/: http://localhost:4173/wikipage/
+npm run preview    # serves dist/: http://localhost:4173/
 ```
 
 ## Pages
@@ -62,4 +62,6 @@ One-time setup in the repository settings:
 - **Pages → Source:** GitHub Actions.
 - **General → Features:** enable Discussions.
 
-The site is served from `/wikipage/`. If the repository is renamed, update `base` in `vite.config.ts`.
+The workflow builds with `BASE_PATH=/wikipage/` because Pages serves the site from `/<repo>/`. If the repository is renamed, update it in the workflow.
+
+The site also deploys on **Vercel** from `/`. `vercel.json` sends every path to `index.html` so direct links like `/map` work.
