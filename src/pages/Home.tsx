@@ -5,6 +5,7 @@ import GlossaryText from '../components/GlossaryText';
 import Badge from '../components/Badge';
 import CompareTable from '../components/CompareTable';
 import TubeMap from '../components/TubeMap';
+import HeroLogo from '../components/HeroLogo';
 import { LINES, SITE_TAGLINE, OMICS_CATEGORIES, DISCUSSIONS_URL, linesFor, recommendLine } from '../data';
 import type { OmicsCategory } from '../data';
 
@@ -61,6 +62,7 @@ export default function Home() {
     <div>
       {/* Hero */}
       <section style={{ padding: '4.5rem 0 3.5rem', textAlign: 'center', maxWidth: '900px', margin: '0 auto' }}>
+        <HeroLogo />
         <div style={{
           display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
           background: 'var(--brand-glow)', padding: '0.35rem 1rem', borderRadius: '2rem',

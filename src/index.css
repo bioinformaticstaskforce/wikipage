@@ -455,3 +455,21 @@ img { max-width: 100%; display: block; }
   .map-side.open { display: block; box-shadow: 0 -8px 24px rgba(0,0,0,0.15); border-radius: var(--radius-xl) var(--radius-xl) 0 0; }
   .map-body { gap: 0 !important; }
 }
+
+/* ── Hero logo animation ─────────────────────────────────── */
+:root { --logo-ink: #334155; }
+[data-theme='dark'] { --logo-ink: #cbd5e1; }
+.hero-logo { width: 112px; height: 112px; display: block; margin: 0 auto 1.25rem; overflow: visible; }
+.hero-logo .link { stroke: var(--logo-ink); stroke-width: 2.5; stroke-dasharray: 24; stroke-dashoffset: 24; animation: hl-draw 0.5s ease-out forwards; animation-delay: var(--d); }
+.hero-logo .dot { transform-box: fill-box; transform-origin: center; animation: hl-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both; animation-delay: var(--d); }
+.hero-logo .ring-grad { opacity: 0; transition: opacity 0.4s; transform-origin: 32px 32px; }
+.hero-logo:hover .ring-grad { opacity: 1; animation: hl-spin 4s linear infinite; }
+.hero-logo:hover .dot { animation: hl-pulse 1.2s ease-in-out infinite; animation-delay: var(--d); }
+@keyframes hl-pop { from { transform: scale(0); } to { transform: scale(1); } }
+@keyframes hl-draw { to { stroke-dashoffset: 0; } }
+@keyframes hl-spin { to { transform: rotate(360deg); } }
+@keyframes hl-pulse { 50% { transform: scale(1.25); } }
+@media (prefers-reduced-motion: reduce) {
+  .hero-logo *, .hero-logo { animation: none !important; transition: none !important; }
+  .hero-logo .link { stroke-dashoffset: 0; }
+}
