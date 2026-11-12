@@ -36,14 +36,7 @@ export default function Layout() {
     }}>
       <header className="header" style={{ flexShrink: 0 }}>
         <Link to="/" onClick={() => setIsMobileMenuOpen(false)} style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-          <svg viewBox="0 0 28 28" style={{ width: '28px', height: '28px' }}>
-            <circle cx="14" cy="14" r="12" fill="none" stroke="#2563eb" strokeWidth="2.5" />
-            <circle cx="9" cy="11" r="3" fill="#059669" />
-            <circle cx="18" cy="11" r="3" fill="#2563eb" />
-            <circle cx="14" cy="19" r="3" fill="#dc2626" />
-            <line x1="9" y1="11" x2="18" y2="11" stroke="#334155" strokeWidth="1.5" />
-            <line x1="18" y1="11" x2="14" y2="19" stroke="#334155" strokeWidth="1.5" />
-          </svg>
+          <img src={`${import.meta.env.BASE_URL}${isDark ? 'logo-reversed' : 'logo'}.svg`} alt="" style={{ width: '28px', height: '28px' }} />
           <span style={{ fontSize: '1.1rem', fontWeight: 700, letterSpacing: '-0.02em' }}>MetrOmics</span>
         </Link>
 
