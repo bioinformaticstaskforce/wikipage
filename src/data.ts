@@ -47,7 +47,22 @@ export interface ClinicalProfile {
   accreditation?: string;  // e.g. "Aligned with ISO 15189"
 }
 
+/* Step-by-step practical guide for a pipeline. Always shown as DRAFT until reviewed by the task force. */
+export interface PipelineGuide {
+  whenToUse: string[];
+  whenNotToUse: string[];
+  decisions: { question: string; answer: string }[];
+  inputs: string;                 // markdown, e.g. samplesheet example
+  run: string;                    // full command
+  resources: string;
+  qcGates: { step: string; check: string; threshold: string }[]; // threshold "TBD" = to be set by the task force
+  outputs: string;                // markdown
+  pitfalls: string[];
+  provenance: { version: string; sources: { label: string; url: string }[]; reviewedBy: string; reviewDate: string };
+}
+
 export interface WikiContent {
+  guide?: PipelineGuide;
   theory: string;
   publications: { title: string; authors: string; journal: string; doi: string; url: string }[];
   examples: { title: string; desc: string; url?: string }[];
@@ -90,6 +105,18 @@ export const GLOSSARY: GlossaryEntry[] = [
   { term: "GVCF", definition: "Genomic VCF — a per-sample VCF that also records reference-confidence blocks, so many samples can be jointly genotyped later." },
   { term: "VQSR", definition: "Variant Quality Score Recalibration — a GATK machine-learning filter for cohort germline calls, trained on known high-confidence variant sites." },
   { term: "TPM", definition: "Transcripts Per Million — a within-sample normalised expression unit that corrects for transcript length and sequencing depth." },
+  { term: "SNV", definition: "Single Nucleotide Variant — a change of one base in the DNA sequence." },
+  { term: "Indel", definition: "A small insertion or deletion of bases, typically up to 50 bp." },
+  { term: "CNV", definition: "Copy Number Variation — a gain or loss of a DNA segment, changing how many copies of it are present." },
+  { term: "SV", definition: "Structural Variant — a large rearrangement (typically > 50 bp) such as a deletion, duplication, inversion or translocation." },
+  { term: "Somatic", definition: "A variant acquired during life and present in the tumour but not in the patient's normal tissue." },
+  { term: "Germline", definition: "A variant inherited from the parents and present in all the patient's cells." },
+  { term: "Tumor-normal", definition: "Analysing a tumour sample together with a matched normal sample from the same patient, which lets the caller discard germline variants." },
+  { term: "Tumor-only", definition: "Analysing a tumour sample without a matched normal; germline variants must be filtered with population databases and a panel of normals, so false positives are more likely." },
+  { term: "TMB", definition: "Tumour Mutational Burden — the number of somatic mutations per megabase of sequenced DNA." },
+  { term: "MSI", definition: "Microsatellite Instability — a hypermutation phenotype caused by defective DNA mismatch repair." },
+  { term: "Duplicate rate", definition: "The fraction of reads that are PCR or optical copies of the same original fragment; high values reduce the effective coverage." },
+  { term: "Orientation bias", definition: "A strand-specific artefact (typically from FFPE damage or oxidation) that creates false low-VAF variants; Mutect2 models it with LearnReadOrientationModel." },
   { term: "Tumor purity", definition: "The fraction of cells in a tumour sample that are cancer cells; it caps the VAF a clonal somatic variant can reach." },
 ];
 
@@ -769,13 +796,74 @@ export const LINES: Line[] = [
       specimen: "Fresh-frozen tissue, FFPE (with artifact filtering)",
       minDNA: "≥ 50 ng (200 ng recommended for WGS)",
       coverage: "≥ 60× tumor, ≥ 30× normal (WGS)",
-      lod: "~5% VAF at 60× coverage",
+      lod: "Indicative ~5% VAF at 60× coverage (to be confirmed by task force validation)",
       reportableRange: "SNVs, small indels (≤ 50 bp), SVs, CNVs",
       tat: "6–10 h per sample pair on 32-core node",
-      accreditation: "Widely used in ISO 15189-compliant labs",
+      accreditation: "The workflow itself is not accredited: each lab must validate it within its own ISO 15189 quality system.",
     },
     supportedVariants: ["SNV", "Indel", "CNV", "SV"],
     wiki: {
+      guide: {
+        whenToUse: [
+          "Somatic SNV, indel, SV and CNV calling from a tumour–normal pair (WES, WGS or panel, Illumina).",
+          "You need a versioned, containerised workflow that runs identically on a laptop, a cluster or the cloud.",
+        ],
+        whenNotToUse: [
+          "cfDNA or ultra-low-VAF samples: use the Sarek UMI / Liquid Biopsy line.",
+          "Tumour-only clinical reporting, unless you have a validated panel of normals and a germline-filtering strategy.",
+          "Long-read data: not covered by this line.",
+        ],
+        decisions: [
+          { question: "Mutect2 or Strelka2?", answer: "This line runs both. Mutect2 is typically the more sensitive caller at low VAF; Strelka2 is fast and strong on indels. Whether the report uses the union, the intersection or one caller is a decision for the lab and must be fixed during validation." },
+          { question: "WES/panel or WGS?", answer: "The same line covers both, but coverage targets, CNV method and runtime differ. Check the clinical profile above and validate your own assay." },
+          { question: "Matched normal available?", answer: "Strongly preferred. Without it the run becomes tumour-only and the false-positive burden rises." },
+        ],
+        inputs: `A CSV samplesheet, one row per FASTQ pair. \`status\` is **0 = normal, 1 = tumour**; rows with the same \`patient\` are paired.
+
+\`\`\`
+patient,sample,sex,status,lane,fastq_1,fastq_2
+P01,P01_N,XX,0,L1,P01_N_R1.fastq.gz,P01_N_R2.fastq.gz
+P01,P01_T,XX,1,L1,P01_T_R1.fastq.gz,P01_T_R2.fastq.gz
+\`\`\`
+
+Reference genome and annotation files: see the Reference files section (maintained separately).`,
+        run: "nextflow run nf-core/sarek -r 3.11.0 -profile singularity \\\n  --input samplesheet.csv --outdir results \\\n  --tools mutect2,strelka,manta,cnvkit,vep \\\n  --genome <reference key: see Reference files> -resume",
+        resources: "Mutect2 and alignment dominate runtime. The clinical profile quotes 6–10 h per tumour–normal pair on a 32-core node. Cap CPU and memory with a custom config (`-c custom.config`). Do a first dry run with `-profile test,singularity` to check the installation before using real data.",
+        qcGates: [
+          { step: "Raw reads (FastQC / fastp)", check: "Base quality, adapter content, read length as expected", threshold: "TBD by task force" },
+          { step: "Alignment", check: "Mapping rate, insert size, no unexpected species", threshold: "TBD by task force" },
+          { step: "Duplicates (MarkDuplicates)", check: "Duplicate rate, effective coverage after dedup", threshold: "TBD by task force" },
+          { step: "Coverage", check: "Mean depth, tumour and normal (WGS)", threshold: "≥ 60× tumour, ≥ 30× normal (from clinical profile, draft)" },
+          { step: "Pair identity", check: "Tumour and normal come from the same patient; sex matches the samplesheet", threshold: "Must pass: otherwise stop" },
+          { step: "Contamination", check: "Cross-sample contamination estimate", threshold: "TBD by task force" },
+          { step: "Orientation bias (FFPE)", check: "Orientation model applied before filtering", threshold: "Must be applied for FFPE" },
+          { step: "Final report (MultiQC)", check: "All samples reviewed in one report before any variant is used", threshold: "Must be done" },
+        ],
+        outputs: `Main folders in the output directory (names can change between versions):
+
+- \`preprocessing/\`: aligned, duplicate-marked and recalibrated BAM/CRAM files
+- \`variant_calling/\`: raw VCFs per caller (Mutect2, Strelka2, Manta, CNVkit)
+- \`annotation/\`: VEP-annotated VCFs
+- \`reports/\`: FastQC and MultiQC reports
+- \`pipeline_info/\`: software versions and execution reports, to archive with every run`,
+        pitfalls: [
+          "Swapping the status column (0/1) silently swaps tumour and normal. Re-check the samplesheet before launching.",
+          "FFPE damage creates false low-VAF C>T / G>A calls. Keep the orientation-bias model and review variants below about 10% VAF.",
+          "Low tumour purity lowers the VAF clonal variants can reach and therefore sensitivity: record purity with every case.",
+          "A panel of normals must be built with the same assay and pipeline version; a mismatched one removes real variants or keeps artefacts.",
+          "Changing a tool, annotation cache or reference between runs breaks comparability: pin every version and archive pipeline_info/.",
+          "Clinical cut-offs on this page are drafts: do not use them for reporting before the task force has reviewed them.",
+        ],
+        provenance: {
+          version: "nf-core/sarek 3.11.0",
+          sources: [
+            { label: "Sarek usage", url: "https://nf-co.re/sarek/usage" },
+            { label: "Sarek output", url: "https://nf-co.re/sarek/output" },
+          ],
+          reviewedBy: "Not yet reviewed",
+          reviewDate: "—",
+        },
+      },
       theory: `
 Sarek is a comprehensive Nextflow-based workflow for somatic and germline variant calling. It implements **GATK Best Practices** but offers extreme modularity: callers are switched on with \`--tools\`.
 
@@ -842,10 +930,10 @@ Setting \`--umi_read_structure\` makes Sarek run \`fgbio\`: reads are grouped by
       specimen: "Fresh-frozen tissue, FFPE",
       minDNA: "≥ 100 ng for WES, ≥ 1 µg for WGS",
       coverage: "≥ 100× target (WES), ≥ 30× (WGS)",
-      lod: "~5–10% VAF depending on coverage and caller mode",
+      lod: "Indicative ~5–10% VAF depending on coverage and caller mode (to be confirmed by task force validation)",
       reportableRange: "Somatic SNVs and small indels",
       tat: "4–8 h per sample (WES) on 16-core node",
-      accreditation: "Broad Institute reference — basis for most clinical validations",
+      accreditation: "Broad Institute reference workflow. Accreditation is the responsibility of each lab's own validation.",
     },
     supportedVariants: ["SNV", "Indel"],
     wiki: {
