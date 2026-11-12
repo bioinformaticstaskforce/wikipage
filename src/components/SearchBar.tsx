@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import { TOOLS, LINES, GLOSSARY } from '../data';
@@ -14,7 +14,6 @@ interface SearchResult {
 export default function SearchBar() {
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
-  const [results, setResults] = useState<SearchResult[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
@@ -28,11 +27,8 @@ export default function SearchBar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  useEffect(() => {
-    if (!query.trim()) {
-      setResults([]);
-      return;
-    }
+  const results = useMemo(() => {
+    if (!query.trim()) return [];
 
     const q = query.toLowerCase();
     const newResults: SearchResult[] = [];
@@ -76,7 +72,7 @@ export default function SearchBar() {
       }
     });
 
-    setResults(newResults.slice(0, 6)); // limit to top 6 results
+    return newResults.slice(0, 6); // limit to top 6 results
   }, [query]);
 
   const handleSelect = (url: string) => {

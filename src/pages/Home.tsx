@@ -404,7 +404,9 @@ export default function Home() {
                     <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.5rem' }}>
                       <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{item.label}</span>
                       <span style={{ fontWeight: 500, fontSize: '0.85rem', textAlign: 'right', maxWidth: '60%' }}>
-                        <GlossaryText text={item.value} />
+                        {item.value.startsWith('Not yet assessed')
+                          ? <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }} title="Figure not yet reviewed by the task force">⚠ Not yet assessed</span>
+                          : <GlossaryText text={item.value} />}
                       </span>
                     </div>
                   ))}

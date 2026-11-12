@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import TubeMap from '../components/TubeMap';
 import CopyButton from '../components/CopyButton';
 import { STATIONS, TOOLS, stepsFor, linesFor } from '../data';
@@ -7,6 +7,32 @@ import type { Line, Station } from '../data';
 const STEPS = stepsFor('DNA');
 const LINES = linesFor('DNA');
 const ORDER = STATIONS.map((s) => s.id);
+
+// bioconda package per tool; tools not listed are noted as unmapped in the file
+const CONDA: Record<string, string> = {
+  fastqc: 'fastqc', fastp: 'fastp', adapterremoval: 'adapterremoval', trimgalore: 'trim-galore',
+  bwamem2: 'bwa-mem2', dragmap: 'dragmap', gatk_markduplicates: 'gatk4', gatk_bqsr: 'gatk4',
+  mutect2: 'gatk4', gatk_filtermutectcalls: 'gatk4', haplotypecaller: 'gatk4',
+  gatk_contamination: 'gatk4', gatk_vqsr: 'gatk4', strelka2: 'strelka', vep: 'ensembl-vep',
+  snpeff: 'snpeff', multiqc: 'multiqc', fgbio: 'fgbio', manta: 'manta', cnvkit: 'cnvkit',
+  star: 'star', salmon: 'salmon', arriba: 'arriba', starfusion: 'star-fusion',
+  fusioncatcher: 'fusioncatcher', deseq2: 'bioconductor-deseq2',
+};
+
+function generateEnv(stops: string[]) {
+  const ids = [...new Set(stops.map((id) => STATIONS.find((s) => s.id === id)).filter((st): st is Station => !!st && st.stepId !== 'input').map((st) => st.toolId))];
+  const pkgs = [...new Set(ids.map((id) => CONDA[id]).filter(Boolean))];
+  const unmapped = ids.filter((id) => !CONDA[id]).map((id) => TOOLS[id].name);
+  return `# MetrOmics generated environment (versions unpinned: pin them for reproducibility)
+name: metromics_custom
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+${pkgs.map((p) => `  - ${p}`).join('\n')}
+${unmapped.length ? `# No conda package mapped (install via its pipeline/container): ${unmapped.join(', ')}\n` : ''}# Heavy tools (e.g. GATK/Mutect2) need substantial RAM/CPU: check resources first.
+`;
+}
 
 /* Builds a script from each tool's reference command */
 function generateBash(stops: string[], date = new Date().toISOString().split('T')[0]) {
@@ -71,6 +97,23 @@ export default function Sandbox() {
   };
 
   const script = generateBash(userStops);
+  const envYml = generateEnv(userStops);
+
+  // Esc closes whichever modal is open
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setShowExport(false); setSelectedStation(null); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  const download = (text: string, name: string) => {
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = name; a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div>
@@ -81,6 +124,9 @@ export default function Sandbox() {
           </h1>
           <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.9rem' }}>
             Toggle tools on or off for each step, then export as a script.
+          </p>
+          <p style={{ color: 'var(--text-muted)', margin: '0.25rem 0 0', fontSize: '0.78rem' }}>
+            Exports are reference commands, not a runnable chain: adjust file names between steps.
           </p>
         </div>
         <button onClick={() => setShowExport(true)} className="btn btn-primary">
@@ -147,14 +193,16 @@ export default function Sandbox() {
               Reference pipelines are faded to highlight your custom path.
             </span>
           </div>
-          <TubeMap activeLines={activeLines} highlightedLineId="l_custom" onStationClick={handleStationClick} />
+          <div style={{ height: 'clamp(380px, 60vh, 640px)' }}>
+            <TubeMap activeLines={activeLines} highlightedLineId="l_custom" onStationClick={handleStationClick} />
+          </div>
         </div>
       </div>
 
       {/* Tool modal */}
       {selectedStation && (
         <div className="modal-backdrop" onClick={() => setSelectedStation(null)}>
-          <div className="card" style={{ maxWidth: '480px', width: '90%' }} onClick={(e) => e.stopPropagation()}>
+          <div className="card" style={{ maxWidth: '480px', width: '90%', maxHeight: '85vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
             <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.75rem' }}>
               {TOOLS[selectedStation.station.toolId].name}
             </h2>
@@ -171,14 +219,14 @@ export default function Sandbox() {
       {/* Export modal */}
       {showExport && (
         <div className="modal-backdrop" onClick={() => setShowExport(false)}>
-          <div className="card" style={{ maxWidth: '720px', width: '90%' }} onClick={(e) => e.stopPropagation()}>
+          <div className="card" style={{ maxWidth: '720px', width: '90%', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h2 style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0 }}>Generated Pipeline Script</h2>
               <button onClick={() => setShowExport(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.1rem', color: 'var(--text-muted)' }}>✕</button>
             </div>
             <pre style={{
               background: '#0f172a', color: '#e2e8f0', padding: '1.25rem',
-              borderRadius: 'var(--radius-md)', overflowX: 'auto', fontSize: '0.78rem',
+              borderRadius: 'var(--radius-md)', overflow: 'auto', flex: '1 1 auto', minHeight: 0, margin: 0, fontSize: '0.78rem',
               fontFamily: 'var(--font-mono)', lineHeight: 1.6
             }}>
               <code>{script}</code>
@@ -187,20 +235,11 @@ export default function Sandbox() {
               <div style={{ flex: 1 }}>
                 <CopyButton text={script} />
               </div>
-              <button
-                onClick={() => {
-                  const blob = new Blob([script], { type: 'text/plain' });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = `custom_pipeline.sh`;
-                  a.click();
-                  URL.revokeObjectURL(url);
-                }}
-                className="btn btn-primary"
-                style={{ flex: 1 }}
-              >
+              <button onClick={() => download(script, 'custom_pipeline.sh')} className="btn btn-primary" style={{ flex: 1 }}>
                 Download .sh
+              </button>
+              <button onClick={() => download(envYml, 'environment.yml')} className="btn btn-primary" style={{ flex: 1 }}>
+                Download environment.yml
               </button>
             </div>
           </div>

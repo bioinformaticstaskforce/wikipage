@@ -41,19 +41,30 @@ export default function MapPage() {
   const [recommenderGoal, setRecommenderGoal] = useState<string>('');
   const [recommenderMaterial, setRecommenderMaterial] = useState<string>(materialParam || '');
 
-  // Auto-highlight based on recommender goal
-  useEffect(() => {
-    const rec = recommendLine(recommenderGoal, recommenderMaterial);
+  // Auto-highlight based on recommender goal (adjusted during render, not in an effect)
+  const rec = recommendLine(recommenderGoal, recommenderMaterial);
+  const [lastRec, setLastRec] = useState('');
+  if (rec !== lastRec) {
+    setLastRec(rec);
     if (rec) setHighlightedLineId(rec);
-  }, [recommenderGoal, recommenderMaterial]);
+  }
 
   // Auto-select tool if URL parameter exists
-  useEffect(() => {
+  const [lastToolStation, setLastToolStation] = useState<Station | undefined>();
+  if (toolStation !== lastToolStation) {
+    setLastToolStation(toolStation);
     if (toolStation) {
       const lineIds = LINES.filter(l => l.stops.includes(toolStation.id)).map(l => l.id);
       setSelectedStation({ station: toolStation, lineIds });
     }
-  }, [toolStation]);
+  }
+
+  // Esc closes the tool panel
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelectedStation(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const switchOmics = (o: OmicsCategory) => {
     setSearchParams({ omics: o });
@@ -203,9 +214,9 @@ export default function MapPage() {
         </div>
       )}
 
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative', gap: selectedStation ? '1.5rem' : '0', transition: 'gap 0.3s ease' }}>
+      <div className="map-body" style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative', gap: selectedStation ? '1.5rem' : '0', transition: 'gap 0.3s ease' }}>
         {/* Map Container */}
-        <div style={{ 
+        <div className="map-canvas" style={{ 
           flex: selectedStation ? '0 0 calc(75% - 0.75rem)' : '1', 
           transition: 'flex 0.3s ease',
           height: '100%',
@@ -225,7 +236,7 @@ export default function MapPage() {
         </div>
 
         {/* Sidebar Container */}
-        <div style={{ 
+        <div className={selectedStation ? 'map-side open' : 'map-side'} style={{ 
           flex: selectedStation ? '0 0 calc(25% - 0.75rem)' : '0 0 0px',
           opacity: selectedStation ? 1 : 0,
           transition: 'flex 0.3s ease, opacity 0.3s ease',

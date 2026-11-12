@@ -5,31 +5,25 @@ import SearchBar from './SearchBar';
 import { DISCUSSIONS_URL } from '../data';
 
 export default function Layout() {
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(() => {
+    try { return localStorage.getItem('theme') === 'dark'; } catch { return false; }
+  });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme === 'dark') {
-      setIsDark(true);
-      document.body.setAttribute('data-theme', 'dark');
-    }
-  }, []);
-
-  // Close mobile menu on route change
-  useEffect(() => {
-    setIsMobileMenuOpen(false);
-  }, [location.pathname]);
+    if (isDark) document.body.setAttribute('data-theme', 'dark');
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const navLinks = [
     { path: '/map', label: 'Interactive Map' },
     { path: '/sandbox', label: 'Sandbox' },
     { path: '/guides', label: 'Clinical Guides' },
     { path: '/wiki', label: 'Wiki Hub' },
+    { path: '/roadmap', label: 'Roadmap' },
   ];
 
-  const isMapRoute = location.pathname === '/map' || location.pathname === '/sandbox';
+  const isMapRoute = location.pathname === '/map';
 
   return (
     <div style={{ 
@@ -37,11 +31,11 @@ export default function Layout() {
       flexDirection: 'column', 
       minHeight: '100vh',
       height: isMapRoute ? '100vh' : 'auto', 
-      width: '100vw', 
+      width: '100%', 
       overflow: isMapRoute ? 'hidden' : 'auto' 
     }}>
       <header className="header" style={{ flexShrink: 0 }}>
-        <Link to="/" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+        <Link to="/" onClick={() => setIsMobileMenuOpen(false)} style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
           <svg viewBox="0 0 28 28" style={{ width: '28px', height: '28px' }}>
             <circle cx="14" cy="14" r="12" fill="none" stroke="#2563eb" strokeWidth="2.5" />
             <circle cx="9" cy="11" r="3" fill="#059669" />
@@ -62,7 +56,7 @@ export default function Layout() {
                 {link.label}
               </Link>
             ))}
-            <a href={DISCUSSIONS_URL} target="_blank" rel="noreferrer" className="nav-link">Discussions ↗</a>
+            <a href={DISCUSSIONS_URL} target="_blank" rel="noreferrer" className="nav-link">Feedback ↗</a>
           </nav>
           
           <button 
@@ -112,13 +106,14 @@ export default function Layout() {
               <Link 
                 key={link.path} 
                 to={link.path} 
+                onClick={() => setIsMobileMenuOpen(false)}
                 className={`nav-link ${location.pathname === link.path ? 'active' : ''}`}
                 style={{ padding: '0.75rem', fontSize: '1.1rem', background: location.pathname === link.path ? 'var(--brand-glow)' : 'var(--bg-secondary)', borderRadius: 'var(--radius-md)' }}
               >
                 {link.label}
               </Link>
             ))}
-            <a href={DISCUSSIONS_URL} target="_blank" rel="noreferrer" className="nav-link">Discussions ↗</a>
+            <a href={DISCUSSIONS_URL} target="_blank" rel="noreferrer" className="nav-link">Feedback ↗</a>
           </nav>
         </div>
       )}

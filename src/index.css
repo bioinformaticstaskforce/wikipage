@@ -447,3 +447,11 @@ img { max-width: 100%; display: block; }
 .file-pill-html { background: rgba(139, 92, 246, 0.15); color: #7c3aed; }
 .file-pill-dir { background: rgba(100, 116, 139, 0.15); color: #475569; }
 
+
+/* ── Map page on narrow screens: tool panel as bottom sheet ── */
+@media (max-width: 1024px) {
+  .map-canvas { flex: 1 1 auto !important; }
+  .map-side { position: absolute; left: 0; right: 0; bottom: 0; height: 60% !important; flex: none !important; z-index: 20; display: none; }
+  .map-side.open { display: block; box-shadow: 0 -8px 24px rgba(0,0,0,0.15); border-radius: var(--radius-xl) var(--radius-xl) 0 0; }
+  .map-body { gap: 0 !important; }
+}

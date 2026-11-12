@@ -91,9 +91,7 @@ export default function TubeMap({
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
-  const handleWheel = (e: React.WheelEvent<SVGSVGElement>) => {
-    e.preventDefault();
-    const zoomFactor = e.deltaY > 0 ? 1.1 : 0.9;
+  const zoom = (zoomFactor: number) => {
     const newW = viewBox.w * zoomFactor;
     const newH = viewBox.h * zoomFactor;
     
@@ -103,6 +101,11 @@ export default function TubeMap({
 
     setViewBox({ x: newX, y: newY, w: newW, h: newH });
   };
+  const handleWheel = (e: React.WheelEvent<SVGSVGElement>) => {
+    e.preventDefault();
+    zoom(e.deltaY > 0 ? 1.1 : 0.9);
+  };
+  const resetView = () => setViewBox({ x: 0, y: 0, w: svgWidth, h: SVG_H });
 
   const handleMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
     setIsDragging(true);
@@ -301,6 +304,13 @@ export default function TubeMap({
           );
         })}
       </svg>
+      <div style={{ position: 'absolute', right: 12, bottom: 12, display: 'flex', gap: 4, alignItems: 'center' }}>
+        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginRight: 6 }}>Drag to pan · scroll or +/− to zoom</span>
+        {([['−', () => zoom(1.2), 'Zoom out'], ['+', () => zoom(0.8), 'Zoom in'], ['⟲', resetView, 'Reset view']] as const).map(([label, fn, title]) => (
+          <button key={title} onClick={fn} title={title} aria-label={title} className="btn"
+            style={{ width: 28, height: 28, padding: 0, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', cursor: 'pointer' }}>{label}</button>
+        ))}
+      </div>
 
       {/* Floating Hover Tooltip */}
       {hoveredStation && !isDragging && (
