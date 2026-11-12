@@ -1,7 +1,7 @@
 /* Ring logo (same geometry as branding/): stations pop in on load, ring turns brand-gradient and spins on hover. */
 export default function HeroLogo() {
   return (
-    <svg className="hero-logo" viewBox="0 0 64 64" role="img" aria-label="MetrOmics">
+    <svg className="hero-logo" viewBox="0 0 64 64" aria-hidden="true">
       <defs>
         <linearGradient id="hl-grad" gradientUnits="userSpaceOnUse" x1="4" y1="32" x2="60" y2="32">
           <stop offset="0" stopColor="#2563eb" />

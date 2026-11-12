@@ -62,14 +62,15 @@ export default function Home() {
     <div>
       {/* Hero */}
       <section style={{ padding: '4.5rem 0 3.5rem', textAlign: 'center', maxWidth: '900px', margin: '0 auto' }}>
-        <HeroLogo />
-        <div style={{
-          display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
-          background: 'var(--brand-glow)', padding: '0.35rem 1rem', borderRadius: '2rem',
-          fontSize: '0.8rem', fontWeight: 600, color: 'var(--brand-primary)', marginBottom: '1.5rem'
-        }}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--brand-primary)' }} />
-          Task Force Computazionale Bioinfo
+        <div className="hero-brand">
+          <HeroLogo />
+          <div className="name" aria-label="MetrOmics">
+            {[...'MetrOmics'].map((c, i) => (
+              <span key={i} aria-hidden="true" className={`ch${i >= 4 ? ' omics' : ''}`} style={{ '--i': i } as React.CSSProperties}>
+                <span className="w">{c}</span>
+              </span>
+            ))}
+          </div>
         </div>
 
         <h1 style={{ fontSize: 'clamp(2.2rem, 5vw, 3.5rem)', fontWeight: 800, marginBottom: '1.25rem', lineHeight: 1.1, letterSpacing: '-0.03em' }}>
@@ -83,14 +84,51 @@ export default function Home() {
           {SITE_TAGLINE}. We map validated community pipelines — from raw sequencing reads to clinical reports — across genomics, transcriptomics, epigenetics, and emerging molecular technologies.
         </p>
 
-        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-          <Link to="/map" className="btn btn-primary" style={{ padding: '0.7rem 1.5rem', fontSize: '0.95rem' }}>
-            Open Interactive Map →
+        {/* How to read the site, then where to go */}
+        <div style={{ display: 'flex', gap: '1.5rem', justifyContent: 'center', flexWrap: 'wrap', margin: '0 auto 2rem', maxWidth: '820px', textAlign: 'left' }}>
+          {[
+            { icon: <line x1="2" y1="8" x2="38" y2="8" stroke="#059669" strokeWidth="4" strokeLinecap="round" />, title: 'Pipeline = line', text: 'Each coloured line is a reference pipeline, read left to right from reads to report.' },
+            { icon: <circle cx="20" cy="8" r="5" fill="var(--bg-secondary)" stroke="#2563eb" strokeWidth="3" />, title: 'Tool = station', text: 'Click a station for what the tool does, its inputs, outputs and commands.' },
+            { icon: <><line x1="2" y1="3" x2="38" y2="13" stroke="#059669" strokeWidth="3" strokeLinecap="round" /><line x1="2" y1="13" x2="38" y2="3" stroke="#dc2626" strokeWidth="3" strokeLinecap="round" /><circle cx="20" cy="8" r="5" fill="var(--bg-secondary)" stroke="var(--text-primary)" strokeWidth="3" /></>, title: 'Shared station = consensus', text: 'Where several lines meet, the community agrees on the tool.' },
+          ].map((h) => (
+            <div key={h.title} style={{ flex: '1 1 220px', maxWidth: '260px' }}>
+              <svg viewBox="0 0 40 16" style={{ width: 40, height: 16, display: 'block', marginBottom: '0.4rem' }}>{h.icon}</svg>
+              <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{h.title}</div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', lineHeight: 1.5 }}>{h.text}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+          <Link to="/map" className="btn btn-primary" style={{ flex: '1 1 280px', maxWidth: '340px', flexDirection: 'column', alignItems: 'flex-start', gap: '0.25rem', padding: '1rem 1.25rem', textAlign: 'left', whiteSpace: 'normal' }}>
+            <span style={{ fontSize: '1rem', fontWeight: 700 }}>Open Interactive Map →</span>
+            <span style={{ fontSize: '0.82rem', fontWeight: 400, opacity: 0.9 }}>Explore the pipelines, filter by variant type or technology, and open any tool.</span>
           </Link>
-          <Link to="/guides" className="btn btn-outline" style={{ padding: '0.7rem 1.5rem', fontSize: '0.95rem' }}>
-            Clinical Guidelines
+          <Link to="/guides" className="btn btn-outline" style={{ flex: '1 1 280px', maxWidth: '340px', flexDirection: 'column', alignItems: 'flex-start', gap: '0.25rem', padding: '1rem 1.25rem', textAlign: 'left', whiteSpace: 'normal' }}>
+            <span style={{ fontSize: '1rem', fontWeight: 700 }}>Guides & Resources →</span>
+            <span style={{ fontSize: '0.82rem', fontWeight: 400, color: 'var(--text-secondary)' }}>Install commands, reference pipelines and links to the official documentation.</span>
           </Link>
         </div>
+      </section>
+
+      {/* Explainer video */}
+      <section style={{ maxWidth: '960px', margin: '0 auto 4.5rem', textAlign: 'center' }}>
+        <h2 style={{ fontSize: '1.75rem', fontWeight: 700, margin: '0 0 0.5rem', letterSpacing: '-0.02em' }}>See it in under a minute</h2>
+        <p style={{ color: 'var(--text-secondary)', margin: '0 0 1.5rem', fontSize: '0.95rem' }}>The problem, the idea, and how MetrOmics works.</p>
+        <video
+          controls preload="metadata" playsInline
+          poster={`${import.meta.env.BASE_URL}metromics-explainer-poster.jpg`}
+          src={`${import.meta.env.BASE_URL}metromics-explainer.mp4`}
+          style={{ width: '100%', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-xl)', background: '#070b16' }}
+        >
+          Your browser does not support video playback.
+        </video>
+        <details style={{ marginTop: '1rem', textAlign: 'left', color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.7 }}>
+          <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Transcript</summary>
+          <p>Every lab builds its own pipeline. Different tools, versions and references mean results that are hard to compare. Choosing the right workflow should not mean starting from scratch.</p>
+          <p>Meet MetrOmics: a tube map for bioinformatics workflows. Each pipeline is a coloured line. Each tool is a station. Answer a few questions, and the recommender suggests the right pipeline. Open any tool to see its inputs and outputs. Then build your own pipeline, and export the script and a Conda environment.</p>
+          <p>One shared standard for PMMP centres, built by the Task Force. DNA and RNA today; methylation, proteomics and fragmentomics next.</p>
+        </details>
       </section>
 
       {/* Multi-Omic Domain Selector (Livello iniziale di navigazione) */}

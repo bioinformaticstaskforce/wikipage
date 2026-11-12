@@ -459,17 +459,27 @@ img { max-width: 100%; display: block; }
 /* ── Hero logo animation ─────────────────────────────────── */
 :root { --logo-ink: #334155; }
 [data-theme='dark'] { --logo-ink: #cbd5e1; }
-.hero-logo { width: 112px; height: 112px; display: block; margin: 0 auto 1.25rem; overflow: visible; }
+.hero-brand { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-bottom: 1.5rem; }
+.hero-brand .name { font-size: clamp(2.4rem, 6vw, 3.6rem); font-weight: 800; letter-spacing: -0.04em; line-height: 1; }
+.hero-brand .ch { display: inline-block; animation: hl-rise 0.5s ease-out both; animation-delay: calc(0.3s + var(--i) * 0.06s); }
+.hero-brand .ch .w { display: inline-block; }
+.hero-brand .omics .w { color: var(--brand-primary); }
+.hero-brand:hover .ch .w { animation: hl-wave 1.4s ease-in-out infinite; animation-delay: calc(var(--i) * 0.08s); }
+.hero-brand:hover .omics .w { animation-name: hl-wave-color; }
+.hero-logo { width: clamp(56px, 9vw, 80px); height: clamp(56px, 9vw, 80px); display: block; overflow: visible; }
 .hero-logo .link { stroke: var(--logo-ink); stroke-width: 2.5; stroke-dasharray: 24; stroke-dashoffset: 24; animation: hl-draw 0.5s ease-out forwards; animation-delay: var(--d); }
 .hero-logo .dot { transform-box: fill-box; transform-origin: center; animation: hl-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both; animation-delay: var(--d); }
 .hero-logo .ring-grad { opacity: 0; transition: opacity 0.4s; transform-origin: 32px 32px; }
-.hero-logo:hover .ring-grad { opacity: 1; animation: hl-spin 4s linear infinite; }
-.hero-logo:hover .dot { animation: hl-pulse 1.2s ease-in-out infinite; animation-delay: var(--d); }
+.hero-brand:hover .ring-grad { opacity: 1; animation: hl-spin 4s linear infinite; }
+.hero-brand:hover .dot { animation: hl-pulse 1.2s ease-in-out infinite; animation-delay: var(--d); }
+@keyframes hl-rise { from { opacity: 0; transform: translateY(0.4em); } }
+@keyframes hl-wave { 50% { transform: translateY(-0.08em); } }
+@keyframes hl-wave-color { 50% { transform: translateY(-0.08em); color: var(--brand-accent); } }
 @keyframes hl-pop { from { transform: scale(0); } to { transform: scale(1); } }
 @keyframes hl-draw { to { stroke-dashoffset: 0; } }
 @keyframes hl-spin { to { transform: rotate(360deg); } }
 @keyframes hl-pulse { 50% { transform: scale(1.25); } }
 @media (prefers-reduced-motion: reduce) {
-  .hero-logo *, .hero-logo { animation: none !important; transition: none !important; }
+  .hero-logo *, .hero-logo, .hero-brand .ch, .hero-brand .w { animation: none !important; transition: none !important; }
   .hero-logo .link { stroke-dashoffset: 0; }
 }
