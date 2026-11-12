@@ -1,0 +1,309 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>MetrOmics explainer</title>
+<style>
+  html, body { margin: 0; background: #070b16; overflow: hidden; }
+  #stage { width: 1920px; height: 1080px; position: relative; overflow: hidden; background: #070b16;
+           font-family: "Inter 24pt", Inter, Arial, sans-serif; color: #f8fafc; }
+  #glow { position: absolute; inset: 0; }
+  #persp { position: absolute; inset: 0; perspective: 1600px; perspective-origin: 50% 50%; }
+  #world { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-style: preserve-3d; }
+  .layer { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+  .layer svg { position: absolute; left: 0; top: 0; overflow: visible; }
+  .floor { position: absolute; left: 50%; top: 50%; width: 5200px; height: 5200px; margin: -2600px 0 0 -2600px;
+           background-image: linear-gradient(rgba(129,140,248,.55) 2px, transparent 2px), linear-gradient(90deg, rgba(129,140,248,.55) 2px, transparent 2px);
+           background-size: 130px 130px; -webkit-mask-image: radial-gradient(closest-side, #000 8%, transparent 92%); opacity: .3; }
+  text { font-family: "Inter 24pt", Inter, Arial, sans-serif; }
+  .mono { font-family: "JetBrains Mono", Menlo, monospace; }
+  #hud { position: absolute; inset: 0; pointer-events: none; }
+  .ttl { position: absolute; left: 110px; top: 96px; }
+  .ttl.center { left: 0; right: 0; top: 232px; text-align: center; }
+  .kick { font-size: 26px; font-weight: 700; color: #a78bfa; white-space: nowrap; }
+  .head { margin-top: 14px; font-size: 76px; font-weight: 800; letter-spacing: -2.5px; line-height: 1.08; }
+  .center .head { font-size: 128px; letter-spacing: -4px; }
+  .ln { display: block; overflow: hidden; padding-bottom: .1em; margin-bottom: -.1em; }
+  .ln i { display: inline-block; font-style: normal; margin-right: .26em; will-change: transform; }
+  .ln i.acc { background: linear-gradient(90deg, #34d399, #3b82f6); -webkit-background-clip: text; color: transparent; }
+  #cap { position: absolute; left: 0; right: 0; bottom: 54px; text-align: center; font-size: 34px; font-weight: 500; padding: 0 260px; line-height: 1.3; color: #e2e8f0; text-shadow: 0 2px 14px rgba(0,0,0,.8); }
+  #sweep { position: absolute; top: -200px; bottom: -200px; width: 520px; left: 0; transform: skewX(-18deg); background: linear-gradient(90deg, transparent, rgba(147,197,253,.28), rgba(255,255,255,.5), rgba(147,197,253,.28), transparent); mix-blend-mode: screen; opacity: 0; }
+  #vig { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 55%, rgba(3,6,15,.75) 100%); }
+  #mini { position: absolute; right: 80px; top: 52px; display: flex; align-items: center; gap: 14px; font-size: 40px; font-weight: 800; letter-spacing: -1px; }
+  #mini span b { color: #3b82f6; font-weight: 800; }
+</style>
+<div id="stage">
+  <div id="glow"></div>
+  <div id="persp"><div id="world">
+    <div class="floor" id="floorB"></div><div class="floor" id="floorT"></div>
+  </div></div>
+  <div id="hud">
+    <div id="vig"></div>
+    <div id="titles"></div>
+    <div id="mini"><svg width="56" height="56" viewBox="0 0 56 56"><circle cx="28" cy="28" r="25" fill="none" stroke="#2563eb" stroke-width="4"/>
+      <line x1="18" y1="22" x2="38" y2="22" stroke="#cbd5e1" stroke-width="2.2"/><line x1="38" y1="22" x2="28" y2="40" stroke="#cbd5e1" stroke-width="2.2"/>
+      <circle cx="18" cy="22" r="5" fill="#10b981"/><circle cx="38" cy="22" r="5" fill="#3b82f6"/><circle cx="28" cy="40" r="5" fill="#ef4444"/></svg>
+      <span>Metr<b>Omics</b></span></div>
+    <div id="sweep"></div><div id="cap"></div>
+  </div>
+</div>
+<script>
+/* Deterministic motion graphics: pure function of time, render(t) draws one frame. True CSS-3D parallax:
+   each layer sits at its own depth, the camera (world transform) dollies, pans and orbits through them. */
+const NS = 'http://www.w3.org/2000/svg', P = 1600;
+const $ = (tag, a = {}, p) => { const e = document.createElementNS(NS, tag); for (const k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; };
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const eo = x => 1 - Math.pow(1 - x, 3), eio = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const eo5 = x => 1 - Math.pow(1 - x, 5);
+const eb = x => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+const lerp = (a, b, t) => a + (b - a) * t;
+const win = (t, a, b, f = .45) => seg(t, a, a + f) * (1 - seg(t, b - f, b));
+const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+const mix = (a, b, t) => { const A = hex(a), B = hex(b); return `rgb(${A.map((v, i) => Math.round(lerp(v, B[i], t))).join(',')})`; };
+let seed = 11; const rnd = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+
+const TL = window.TL || { total: 45, segs: [
+  { id: 'problem', start: 0, end: 8, cap: 'Every lab builds its own pipeline.' }, { id: 'turn', start: 8, end: 12.5, cap: 'Not from scratch.' },
+  { id: 'intro', start: 12.5, end: 17, cap: 'Meet MetrOmics.' }, { id: 'a', start: 17, end: 22, cap: 'Line, station.' }, { id: 'b', start: 22, end: 27.5, cap: 'Recommender.' },
+  { id: 'c', start: 27.5, end: 36, cap: 'Tool, sandbox.' }, { id: 'end', start: 36, end: 45, cap: 'One standard.' }] };
+const SG = Object.fromEntries(TL.segs.map(s => [s.id, s]));
+const GREEN = '#10b981', BLUE = '#3b82f6', RED = '#ef4444', VIOLET = '#8b5cf6', AMBER = '#f59e0b';
+const LC = [GREEN, BLUE, RED, VIOLET], MUD = ['#a8a29e', '#fbbf24', '#f472b6', '#94a3b8'];
+
+/* ---------- 3D scene graph ---------- */
+const world = document.getElementById('world');
+let layerN = 0;
+const layer = (z, blurPx = 0) => { const d = document.createElement('div'); d.className = 'layer';
+  d.style.transform = `translateZ(${z}px) scale(${(P - z) / P})`; if (blurPx) d.style.filter = `blur(${blurPx}px)`;
+  const svg = $('svg', { width: 1920, height: 1080, viewBox: '0 0 1920 1080' }); d.appendChild(svg); world.appendChild(d);
+  const defs = $('defs', {}, svg); const f = $('filter', { id: 'b8_' + (layerN++), x: '-60%', y: '-60%', width: '220%', height: '220%' }, defs); $('feGaussianBlur', { stdDeviation: 8 }, f);
+  return { d, svg, defs, g: $('g', {}, svg), b8: 'url(#' + f.id + ')' }; };
+const Lfar = layer(-900, 1.6), Lmid = layer(-320, 1), Lmap = layer(0), Lui = layer(110), Llogo = layer(170), Lnear = layer(520, 9);
+const B8 = { map: Lmap.b8, logo: Llogo.b8 };
+const sh = $('filter', { id: 'shadow', x: '-20%', y: '-20%', width: '140%', height: '150%' }, Lui.defs);
+$('feDropShadow', { dx: 0, dy: 18, stdDeviation: 22, 'flood-color': '#000', 'flood-opacity': .5 }, sh);
+const gr = $('linearGradient', { id: 'brand', gradientUnits: 'userSpaceOnUse', x1: 4, y1: 32, x2: 60, y2: 32 }, Llogo.defs);
+$('stop', { offset: 0, 'stop-color': '#2563eb' }, gr); $('stop', { offset: 1, 'stop-color': '#7c3aed' }, gr);
+
+const glowEl = document.getElementById('glow');
+/* far: DNA helices + dust */
+const dust = Array.from({ length: 110 }, () => ({ x: rnd() * 2600 - 340, y: rnd() * 1500 - 210, r: .8 + rnd() * 2.2, ph: rnd() * 6.28, el: null }));
+dust.forEach(d => d.el = $('circle', { cx: d.x, cy: d.y, r: d.r, fill: '#cbd5e1' }, Lfar.g));
+const helix = (y0, amp, col1, col2, ph0) => { const g = $('g', {}, Lfar.g), N = 46, a = [], b = [], r = [];
+  for (let i = 0; i < N; i++) r.push($('line', { stroke: '#64748b', 'stroke-width': 2, opacity: .5 }, g));
+  for (let i = 0; i < N; i++) { a.push($('circle', { r: 7, fill: col1 }, g)); b.push($('circle', { r: 7, fill: col2 }, g)); }
+  return { g, y0, amp, a, b, r, N, ph0 }; };
+const helices = [helix(150, 60, '#3b82f6', '#8b5cf6', 0), helix(960, 70, '#10b981', '#3b82f6', 2)];
+[[260, 880, 300, VIOLET], [1700, 240, 340, BLUE], [1000, 1000, 260, GREEN]].forEach(([x, y, r, c]) => $('circle', { cx: x, cy: y, r, fill: c, opacity: .16 }, Lfar.g));
+
+/* ---------- map geometry ---------- */
+const CX0 = 520, DX = 150, CY = 560, OFF = [-150, -50, 50, 150], HUBS = [0, 2, 5, 8];
+const COLS = Array.from({ length: 11 }, (_, j) => j - 1);
+const ord = (k, i) => ({ x: CX0 + i * DX, y: CY + (HUBS.includes(i) || i < 0 || i > 8 ? 0 : OFF[k]) });
+const chaos = LC.map(() => COLS.map(() => ({ dx: (rnd() - .5) * 260, dy: (rnd() - .5) * 620, ph: rnd() * 6.28, sp: .6 + rnd() * .6 })));
+const pts = (t, k, u) => COLS.map((i, j) => { const o = ord(k, i), c = chaos[k][j], w = 1 - u;
+  return { x: o.x + w * (c.dx + 20 * Math.sin(t * c.sp + c.ph)) - (i < 0 ? w * 400 : 0) + (i > 8 ? w * 400 : 0), y: o.y + w * (c.dy + 26 * Math.cos(t * c.sp * 1.3 + c.ph)) }; });
+const smooth = p => { let d = `M${p[0].x},${p[0].y}`; for (let i = 0; i < p.length - 1; i++) { const p0 = p[i - 1] || p[i], p1 = p[i], p2 = p[i + 1], p3 = p[i + 2] || p2;
+  d += ` C${p1.x + (p2.x - p0.x) / 6},${p1.y + (p2.y - p0.y) / 6} ${p2.x - (p3.x - p1.x) / 6},${p2.y - (p3.y - p1.y) / 6} ${p2.x},${p2.y}`; } return d; };
+const mg = Lmap.g;
+const glow = LC.map(() => $('path', { fill: 'none', 'stroke-linecap': 'round', filter: B8.map, opacity: 0 }, mg));
+const lines = LC.map(() => $('path', { fill: 'none', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, mg));
+const nodes = LC.map((_, k) => COLS.slice(1, 10).map(i => ({ k, i, el: $('circle', { r: 7 }, mg) })));
+const hubRings = HUBS.map(i => $('circle', { cx: ord(0, i).x, cy: CY, r: 24, fill: '#070b16', stroke: '#f8fafc', 'stroke-width': 6, opacity: 0 }, mg));
+const label = (txt, x, y, size, w, col) => { const e = $('text', { x, y, 'font-size': size, 'font-weight': w, fill: col, 'text-anchor': 'middle', opacity: 0, stroke: '#070b16', 'stroke-width': 9, 'paint-order': 'stroke', 'stroke-linejoin': 'round' }, mg); e.textContent = txt; return e; };
+const hubLabels = ['FASTQ', 'BWA-MEM2', 'Filtering', 'MultiQC'].map((n, k) => label(n, ord(0, HUBS[k]).x, CY + 58, 26, 700, '#f8fafc'));
+const toolLabels = Object.entries({ 1: 'fastp', 3: 'Mutect2', 4: 'Strelka2', 6: 'VEP' }).map(([i, n]) => label(n, ord(0, +i).x, ord(0, +i).y - 30, 24, 600, '#a7f3d0'));
+const rings = [1, 3, 4, 6, 7].map(i => ({ i, el: $('circle', { cx: ord(0, i).x, cy: ord(0, i).y, r: 12, fill: 'none', stroke: GREEN, 'stroke-width': 4, opacity: 0 }, mg) }));
+/* data packet with trail */
+const trail = Array.from({ length: 14 }, () => $('circle', { r: 8, fill: '#fff', opacity: 0 }, mg));
+const pk = $('g', { opacity: 0 }, mg), pkGlow = $('circle', { r: 40, opacity: .5, filter: B8.map }, pk), pkR = $('rect', { x: -52, y: -22, width: 104, height: 44, rx: 22 }, pk), pkT = $('text', { y: 7, 'font-size': 20, 'font-weight': 800, 'text-anchor': 'middle', fill: '#06281d', class: 'mono' }, pk);
+
+/* chaos chips (mid layer, behind the lines) */
+const chipData = [['bwa 0.7.17', 780, 250], ['GATK 4.1', 1180, 190], ['hg19', 1560, 270], ['GATK 4.4', 1420, 420], ['which reference?', 700, 880], ['final_v3_REAL.sh', 1500, 860],
+  ['GRCh38', 1000, 890], ['--threads ?', 1700, 600], ['samtools 1.9', 640, 360], ['env.yml ???', 1240, 800], ['Mutect2 or Strelka2?', 330, 880], ['v2.3', 1800, 420]];
+const chips = chipData.map(([txt, x, y], n) => { const w = txt.length * 15 + 44, g = $('g', {}, Lmid.g);
+  $('rect', { x: -w / 2, y: -26, width: w, height: 52, rx: 26, fill: '#1e293b', stroke: '#fbbf24', 'stroke-opacity': .55, 'stroke-width': 2 }, g);
+  const tx = $('text', { 'text-anchor': 'middle', y: 8, 'font-size': 24, fill: '#fde68a', 'font-weight': 600 }, g); tx.textContent = txt; return { g, x, y, n, ph: rnd() * 6.28 }; });
+
+/* near layer: big out-of-focus shapes drifting fast (strong parallax) */
+const near = [[300, 300, 50, BLUE], [1650, 820, 66, VIOLET], [900, 980, 40, GREEN], [1500, 120, 34, RED], [140, 760, 56, AMBER], [1100, 60, 30, BLUE]].map(([x, y, r, c], n) => ({ x, y, n, el: $('circle', { r, fill: c, opacity: .28 }, Lnear.g) }));
+
+/* ---------- HUD kinetic titles ---------- */
+const tt = document.getElementById('titles');
+const TT = [
+  { seg: 'problem', kick: 'THE PROBLEM', lines: [['Every', 'lab', 'builds'], ['its', 'own', 'pipeline.']], acc: ['pipeline.'] },
+  { seg: 'turn', kick: 'THE IDEA', lines: [["Don't", 'start'], ['from', 'scratch.']], acc: ['scratch.'] },
+  { seg: 'a', kick: 'HOW IT WORKS', lines: [['Pipeline', '=', 'line.'], ['Tool', '=', 'station.']], acc: ['line.', 'station.'] },
+  { seg: 'b', kick: 'GUIDED CHOICE', lines: [['Answer', 'a', 'few'], ['questions.']], acc: ['questions.'] },
+  { seg: 'c', kick: 'FROM TOOL TO SCRIPT', lines: [['Understand', 'it.', 'Build', 'it.'], ['Export', 'it.']], acc: ['Export'] },
+  { seg: 'end', kick: 'THE GOAL', center: true, lines: [['One', 'shared', 'standard']], acc: ['standard'] },
+].map(T => { const el = document.createElement('div'); el.className = 'ttl' + (T.center ? ' center' : '');
+  el.innerHTML = `<div class="kick">${T.kick}</div><div class="head">${T.lines.map(l => `<span class="ln">${l.map(w => `<i class="${T.acc.includes(w) ? 'acc' : ''}">${w}</i>`).join('')}</span>`).join('')}</div>`;
+  tt.appendChild(el); T.el = el; T.kickEl = el.querySelector('.kick'); T.words = [...el.querySelectorAll('i')]; return T; });
+const putTitle = (T, t) => { const s = SG[T.seg], endT = T.seg === 'end' ? s.start + (s.end - s.start) * .66 : s.end;
+  T.kickEl.style.opacity = win(t, s.start + .05, endT, .4); T.kickEl.style.letterSpacing = lerp(22, 7, eo(seg(t, s.start + .05, s.start + .9))) + 'px';
+  T.words.forEach((w, n) => { const pin = eo5(seg(t, s.start + .12 + n * .085, s.start + .8 + n * .085)), pout = eio(seg(t, endT - .45 + n * .03, endT - .05 + n * .03));
+    w.style.transform = `translateY(${(1 - pin) * 118 - pout * 118}%)`; });
+  T.el.style.display = (t >= s.start && t <= endT + .1) ? 'block' : 'none'; };
+
+/* ---------- logo ---------- */
+const sym = $('g', {}, Llogo.g), S = 3.6, LX = 960 - 32 * S, LY = 330 - 32 * S; sym.setAttribute('transform', `translate(${LX},${LY}) scale(${S})`);
+const logoGlow = $('circle', { cx: 32, cy: 32, r: 34, fill: 'none', stroke: 'url(#brand)', 'stroke-width': 10, filter: B8.logo, opacity: 0 }, sym);
+const ringC = $('circle', { cx: 32, cy: 32, r: 28, fill: 'none', stroke: '#2563eb', 'stroke-width': 4, 'stroke-dasharray': 176, 'stroke-linecap': 'round', transform: 'rotate(-90 32 32)' }, sym);
+const lk = [[21, 25, 43, 25], [43, 25, 32, 44]].map(([a, b, c, d]) => $('line', { x1: a, y1: b, x2: c, y2: d, stroke: '#cbd5e1', 'stroke-width': 2.5, 'stroke-dasharray': 24 }, sym));
+const st3 = [[21, 25, GREEN], [43, 25, BLUE], [32, 44, RED]].map(([x, y, c]) => { const e = $('circle', { cx: x, cy: y, r: 6, fill: c }, sym); e.px = x; e.py = y; return e; });
+const sparks = Array.from({ length: 26 }, (_, n) => { const c = [GREEN, BLUE, RED, '#fff'][n % 4]; return { a: rnd() * 6.28, v: 30 + rnd() * 70, el: $('circle', { r: .9 + rnd() * 1.1, fill: c, opacity: 0 }, sym) }; });
+const word = [...'MetrOmics'].map((c, i) => { const e = $('text', { 'font-size': 168, 'font-weight': 800, fill: i < 4 ? '#f8fafc' : '#3b82f6', 'letter-spacing': -6, y: 680 }, Llogo.g); e.textContent = c; return e; });
+const tag = $('text', { x: 960, y: 760, 'font-size': 42, fill: '#94a3b8', 'text-anchor': 'middle', 'font-weight': 500 }, Llogo.g); tag.textContent = 'A tube map for bioinformatics workflows';
+const org = $('text', { x: 960, y: 790, 'font-size': 38, fill: '#cbd5e1', 'text-anchor': 'middle', 'font-weight': 600 }, Llogo.g); org.textContent = 'Task Force Computazionale Bioinfo  ·  PMMP';
+const flare = $('rect', { x: -260, y: 540, width: 160, height: 190, fill: '#fff', opacity: 0, transform: 'skewX(-20)' }, Llogo.g);
+const wl = [];
+
+/* ---------- panels (ui layer, floats in front of the map) ---------- */
+const ui = Lui.g;
+const glass = (g, x, y, w, h) => $('rect', { x, y, width: w, height: h, rx: 28, fill: '#0f172a', 'fill-opacity': .88, stroke: '#94a3b8', 'stroke-opacity': .28, 'stroke-width': 2, filter: 'url(#shadow)' }, g);
+const txt = (p, s, x, y, size, w, col, extra = {}) => { const e = $('text', { x, y, 'font-size': size, 'font-weight': w, fill: col, ...extra }, p); e.textContent = s; return e; };
+const rec = $('g', {}, ui); glass(rec, 70, 360, 390, 470); txt(rec, 'Recommender', 106, 420, 34, 800, '#f8fafc');
+const recRows = [['Goal', 'Somatic'], ['Sample', 'FFPE tissue'], ['Technology', 'Illumina']].map(([a, b], n) => { const y = 470 + n * 105, g = $('g', {}, rec);
+  txt(g, a.toUpperCase(), 106, y + 20, 20, 700, '#94a3b8', { 'letter-spacing': 3 });
+  $('rect', { x: 106, y: y + 36, width: 318, height: 56, rx: 16, fill: '#1e293b', stroke: '#475569', 'stroke-width': 2 }, g);
+  const sel = $('rect', { x: 106, y: y + 36, width: 318, height: 56, rx: 16, fill: '#2563eb', opacity: 0 }, g);
+  txt(g, b, 130, y + 74, 28, 600, '#f8fafc'); const ck = txt(g, '✓', 390, y + 74, 28, 800, '#fff', { opacity: 0 });
+  const rp = $('circle', { cx: 265, cy: y + 64, r: 10, fill: 'none', stroke: '#93c5fd', 'stroke-width': 4, opacity: 0 }, g); return { sel, ck, rp }; });
+const badge = $('g', {}, ui); $('rect', { x: 1270, y: 236, width: 480, height: 74, rx: 37, fill: GREEN }, badge);
+txt(badge, 'Recommended: nf-core/sarek', 1510, 283, 28, 800, '#06281d', { 'text-anchor': 'middle' });
+const card = $('g', {}, ui); glass(card, 1060, 110, 480, 250);
+txt(card, 'Mutect2', 1096, 175, 46, 800, '#f8fafc'); txt(card, 'Calls somatic SNVs and indels', 1096, 217, 24, 500, '#94a3b8');
+const chipRow = (g, items, x, y, col) => { let cx = x; return items.map(s => { const w = s.length * 13.5 + 36, e = $('g', {}, g);
+  $('rect', { x: cx, y, width: w, height: 44, rx: 22, fill: col, 'fill-opacity': .2, stroke: col, 'stroke-width': 2 }, e); txt(e, s, cx + w / 2, y + 29, 20, 600, '#f8fafc', { 'text-anchor': 'middle', class: 'mono' }); cx += w + 10; return e; }); };
+txt(card, 'IN', 1096, 273, 18, 700, '#64748b', { 'letter-spacing': 3 }); const cin = chipRow(card, ['tumor.bam', 'normal.bam'], 1140, 243, BLUE);
+txt(card, 'OUT', 1096, 341, 18, 700, '#64748b', { 'letter-spacing': 3 }); const cout = chipRow(card, ['somatic.vcf.gz'], 1156, 311, GREEN);
+const conn = $('path', { fill: 'none', stroke: GREEN, 'stroke-width': 3, 'stroke-dasharray': '8 8', opacity: 0 }, ui);
+const sb = $('g', {}, ui); glass(sb, 520, 742, 830, 208); txt(sb, 'Sandbox', 556, 792, 28, 800, '#f8fafc');
+let tgx = 700; const tg = ['fastp', 'BWA-MEM2', 'Mutect2', 'VEP'].map((s, n) => { const w = s.length * 14 + 44, xs = tgx, g = $('g', {}, sb); tgx += w + 14;
+  const r = $('rect', { x: xs, y: 764, width: w, height: 42, rx: 21, fill: '#1e293b', stroke: '#475569', 'stroke-width': 2 }, g); txt(g, s, xs + w / 2, 792, 21, 600, '#f8fafc', { 'text-anchor': 'middle' }); return { r }; });
+const code = ['set -euo pipefail', '# Step 3/4: Mutect2', 'gatk Mutect2 -R ref.fa -I tumor.bam -I normal.bam'];
+const codeEl = code.map((s, n) => txt(sb, '', 556, 856 + n * 36, 24, 500, n === 1 ? '#64748b' : '#a7f3d0', { class: 'mono' }));
+const cursor = $('rect', { width: 12, height: 26, fill: '#a7f3d0' }, sb);
+const files = [['custom_pipeline.sh', GREEN], ['environment.yml', BLUE]].map(([s, c], n) => { const g = $('g', {}, ui), y = 762 + n * 92;
+  glass(g, 1400, y, 400, 78); $('rect', { x: 1424, y: y + 20, width: 30, height: 38, rx: 6, fill: c }, g); txt(g, s, 1472, y + 50, 26, 700, '#f8fafc', { class: 'mono' }); return { g, y }; });
+const fin = $('g', {}, ui);
+const mkChip = (s, x, c, dashed) => { const w = s.length * 19 + 64, g = $('g', {}, fin); $('rect', { x: x - w / 2, y: 640, width: w, height: 70, rx: 35, fill: dashed ? 'none' : c, stroke: c, 'stroke-width': 3, 'stroke-dasharray': dashed ? '10 8' : '0' }, g);
+  txt(g, s, x, 686, 30, 700, dashed ? c : '#fff', { 'text-anchor': 'middle' }); return g; };
+const chipsNow = [mkChip('DNA', 700, GREEN, false), mkChip('RNA', 900, BLUE, false)];
+const chipsNext = [mkChip('Methylation', 1180, VIOLET, true), mkChip('Proteomics', 1440, AMBER, true), mkChip('Fragmentomics', 1710, RED, true)];
+const nowLab = txt(fin, 'TODAY', 800, 750, 22, 700, '#64748b', { 'text-anchor': 'middle', 'letter-spacing': 6 });
+const nextLab = txt(fin, 'NEXT', 1440, 750, 22, 700, '#64748b', { 'text-anchor': 'middle', 'letter-spacing': 6 });
+const capEl = document.getElementById('cap'), sweepEl = document.getElementById('sweep'), miniEl = document.getElementById('mini');
+const floorB = document.getElementById('floorB'), floorT = document.getElementById('floorT');
+floorB.style.transform = 'translateY(560px) rotateX(90deg)'; floorT.style.transform = 'translateY(-560px) rotateX(-90deg)';
+
+/* ---------- camera ---------- */
+const K = () => { const T = SG.turn, I = SG.intro, A = SG.a, B = SG.b, C = SG.c, E = SG.end, cd = C.end - C.start;
+  return [
+    [0, -80, 20, -90, 2, 12], [T.start, 60, -10, 130, 1, -7], [T.end, 0, 0, 10, 0, 0], [I.start + .5, 0, 20, -60, 0, 0], [I.end, 0, 10, -20, 0, 0],
+    [A.start + .2, -420, 0, 70, 0, 9], [A.end - .5, 420, 0, 70, 0, -9],
+    [B.start + .4, -90, 10, 20, 0, 8], [B.end - .3, 50, 0, 40, 0, -4],
+    [C.start + cd * .13, 10, -130, 380, 0, 0], [C.start + cd * .48, 14, -126, 400, 0, -3], [C.start + cd * .62, 0, 40, 40, 0, 0], [C.end, 0, 40, 0, 0, 0],
+    [E.start + 1, 0, 0, -40, 0, 0], [E.end, 0, 0, -260, 2, 0]]; };
+let KS = null;
+function cam(t) { KS = KS || K(); let a = KS[0], b = KS[KS.length - 1];
+  for (let i = 0; i < KS.length - 1; i++) if (t >= KS[i][0] && t < KS[i + 1][0]) { a = KS[i]; b = KS[i + 1]; break; }
+  if (t >= KS[KS.length - 1][0]) a = b; const p = a === b ? 1 : eio(seg(t, a[0], b[0])); const c = [1, 2, 3, 4, 5].map(j => lerp(a[j], b[j], p));
+  return { x: c[0] + 22 * Math.sin(t * .5), y: c[1] + 12 * Math.sin(t * .37), d: c[2], rx: c[3] + .6 * Math.sin(t * .31), ry: c[4] + 1.2 * Math.sin(t * .27) }; }
+
+/* ---------- frame ---------- */
+function render(t) {
+  const Pb = SG.problem, T = SG.turn, I = SG.intro, A = SG.a, B = SG.b, C = SG.c, E = SG.end, cd = C.end - C.start, ed = E.end - E.start;
+  const c = cam(t); world.style.transform = `translate3d(${-c.x}px,${-c.y}px,${c.d}px) rotateX(${c.rx}deg) rotateY(${c.ry}deg)`;
+  const fl = t * 90; floorB.style.backgroundPosition = `${-c.x * .2}px ${fl}px`; floorT.style.backgroundPosition = `${-c.x * .2}px ${-fl}px`;
+  glowEl.style.background = `radial-gradient(ellipse 70% 60% at ${50 + c.x * .02}% ${48 + c.y * .02}%, ${mix('#1a2250', '#122a4a', .5 + .5 * Math.sin(t * .3))} 0%, #070b16 78%)`;
+
+  dust.forEach(d => d.el.setAttribute('opacity', .2 + .35 * Math.sin(t * .9 + d.ph)));
+  helices.forEach(h => { const ph = t * .9 + h.ph0; for (let i = 0; i < h.N; i++) { const x = -250 + i * 56, w = Math.sin(x * .011 + ph), y1 = h.y0 + h.amp * w, y2 = h.y0 - h.amp * w;
+    h.a[i].setAttribute('cx', x); h.a[i].setAttribute('cy', y1); h.b[i].setAttribute('cx', x); h.b[i].setAttribute('cy', y2);
+    const sc = .55 + .45 * Math.cos(x * .011 + ph); h.a[i].setAttribute('r', 4 + 5 * sc); h.b[i].setAttribute('r', 4 + 5 * (1 - sc));
+    h.r[i].setAttribute('x1', x); h.r[i].setAttribute('x2', x); h.r[i].setAttribute('y1', y1); h.r[i].setAttribute('y2', y2); }
+    h.g.setAttribute('opacity', .3 * (1 - seg(t, E.start + ed * .7, E.start + ed * .8) * .5)); });
+  near.forEach(n => n.el.setAttribute('transform', `translate(${70 * Math.sin(t * .22 + n.n * 1.3)},${50 * Math.cos(t * .18 + n.n)}) translate(${n.x},${n.y})`));
+  Lnear.d.style.opacity = lerp(1, .55, seg(t, C.start + cd * .1, C.start + cd * .2)) * (1 - .5 * seg(t, E.start, E.start + 1));
+
+  /* map visibility */
+  const ctt = t - C.start, focus = Math.max(win(ctt, cd * .1, cd * .52, .5), win(ctt, cd * .5, cd + .6, .5));
+  const mapA = t < I.start ? 1 : t < A.start ? lerp(1, .1, win(t, I.start, I.end + .3, .5)) : 1;
+  Lmap.d.style.opacity = mapA * lerp(1, .1, seg(t, E.start, E.start + .8)) * (1 - .62 * focus);
+  const u = eio(seg(t, T.start + .5, T.end - .15)), hi = seg(t, B.start + (B.end - B.start) * .5, B.start + (B.end - B.start) * .66), hiOff = seg(t, C.start - .01, C.start + .8);
+  lines.forEach((p, k) => { const P_ = pts(t, k, u), d = smooth(P_), dim = lerp(1, .16, hi * (1 - hiOff) * (k === 0 ? 0 : 1));
+    p.setAttribute('d', d); p.setAttribute('stroke', mix(MUD[k], LC[k], u)); p.setAttribute('stroke-width', lerp(5, 9, u) * (k === 0 ? 1 + .45 * hi * (1 - hiOff) : 1)); p.setAttribute('opacity', lerp(.75, 1, u) * dim);
+    glow[k].setAttribute('d', d); glow[k].setAttribute('stroke', LC[k]); glow[k].setAttribute('stroke-width', 22); glow[k].setAttribute('opacity', k === 0 ? (.55 * hi * (1 - hiOff)) + .25 * u : .1 * u);
+    nodes[k].forEach(n => { const q = P_[n.i + 1], isHub = HUBS.includes(n.i); n.el.setAttribute('cx', q.x); n.el.setAttribute('cy', q.y); n.el.setAttribute('r', lerp(6, 12, u));
+      n.el.setAttribute('fill', mix(MUD[k], '#070b16', u)); n.el.setAttribute('stroke', mix(MUD[k], LC[k], u)); n.el.setAttribute('stroke-width', lerp(0, 5, u));
+      n.el.setAttribute('opacity', (isHub && k > 0 ? 0 : 1) * lerp(.7, 1, u) * dim); }); });
+  /* packet: FASTQ -> BAM -> VCF running along the green line */
+  const q = eio(seg(t, A.start + .35, A.end - .45)), len = lines[0].getTotalLength(), pp = lines[0].getPointAtLength(len * (.08 + .84 * q)), pon = win(t, A.start + .25, A.end - .3, .3);
+  const lab = q < .34 ? ['FASTQ', AMBER] : q < .67 ? ['BAM', '#60a5fa'] : ['VCF', '#34d399'];
+  pk.setAttribute('transform', `translate(${pp.x},${pp.y})`); pk.setAttribute('opacity', pon); pkR.setAttribute('fill', lab[1]); pkGlow.setAttribute('fill', lab[1]); pkT.textContent = lab[0];
+  trail.forEach((s, n) => { const qq = clamp(q - (n + 1) * .014), p2 = lines[0].getPointAtLength(len * (.08 + .84 * qq)); s.setAttribute('cx', p2.x); s.setAttribute('cy', p2.y);
+    s.setAttribute('r', 8 * (1 - n / 15)); s.setAttribute('fill', lab[1]); s.setAttribute('opacity', pon * (1 - n / 14) * .6); });
+  hubRings.forEach(h => { h.setAttribute('opacity', seg(u, .85, 1)); h.setAttribute('r', 24 * eb(seg(u, .85, 1) || .0001)); });
+  const lb = seg(t, T.end - .2, T.end + .6); hubLabels.forEach(e => e.setAttribute('opacity', lb));
+  toolLabels.forEach((e, n) => e.setAttribute('opacity', seg(t, A.start + .2 + n * .12, A.start + .7 + n * .12)));
+  rings.forEach(r => { const k = seg(pp.x, ord(0, r.i).x - 10, ord(0, r.i).x + 220); r.el.setAttribute('r', 12 + 26 * k); r.el.setAttribute('opacity', k > 0 && k < 1 && pon > 0 ? (1 - k) : 0); });
+
+  chips.forEach(ch => { const a = seg(t, Pb.start + .5 + ch.n * .35, Pb.start + 1 + ch.n * .35) * (1 - seg(t, T.start, T.start + .7));
+    ch.g.setAttribute('opacity', a); ch.g.setAttribute('transform', `translate(${ch.x + 28 * Math.sin(t * .35 + ch.ph)},${ch.y + 22 * Math.cos(t * .3 + ch.ph)}) scale(${.8 + .2 * a}) rotate(${6 * Math.sin(t * .4 + ch.ph)})`); });
+  TT.forEach(T_ => putTitle(T_, t));
+
+  /* logo */
+  const li = t - I.start, endShow = seg(t, E.start + ed * .8, E.start + ed * .9);
+  ringC.setAttribute('stroke-dashoffset', 176 * (1 - eo(seg(li, 0, .8))));
+  logoGlow.setAttribute('opacity', (.55 * win(li, .6, 2.6, .5)) + .4 * endShow);
+  lk.forEach((l, n) => l.setAttribute('stroke-dashoffset', 24 * (1 - eo(seg(li, .5 + n * .15, .9 + n * .15)))));
+  st3.forEach((s, n) => { const p = eb(seg(li, .75 + n * .12, 1.2 + n * .12) || 0), o = seg(li, .75 + n * .12, .85 + n * .12); s.setAttribute('opacity', o); s.setAttribute('transform', `translate(${s.px},${s.py}) scale(${p}) translate(${-s.px},${-s.py})`); });
+  sparks.forEach(s => { const k = seg(li, .85, 1.9); s.el.setAttribute('cx', 32 + Math.cos(s.a) * (28 + s.v * eo(k) * .5)); s.el.setAttribute('cy', 32 + Math.sin(s.a) * (28 + s.v * eo(k) * .5)); s.el.setAttribute('opacity', k > 0 ? (1 - k) * .9 : 0); });
+  let x = 960 - wl.reduce((a, b) => a + b, 0) / 2; word.forEach((w, n) => { const p = eo5(seg(li, .7 + n * .06, 1.25 + n * .06)); w.setAttribute('x', x); x += wl[n] || 0;
+    w.setAttribute('opacity', p); w.setAttribute('transform', `translate(0,${(1 - p) * 80})`); w.style.filter = `blur(${(1 - p) * 14}px)`; });
+  const fl_ = seg(li, 1.5, 2.3); flare.setAttribute('x', lerp(380, 1560, fl_)); flare.setAttribute('opacity', fl_ > 0 && fl_ < 1 ? .28 * Math.sin(fl_ * Math.PI) : 0);
+  tag.setAttribute('opacity', seg(li, 1.4, 1.9) * (1 - seg(t, I.end, I.end + .6)) * (1 - endShow)); org.setAttribute('opacity', endShow);
+  Llogo.d.style.opacity = Math.max(win(t, I.start, A.start + .3, .35), endShow);
+  Llogo.g.setAttribute('transform', `translate(960,540) scale(${lerp(1, 1.07, seg(li, 0, 3.5))}) translate(-960,-540)`);
+  miniEl.style.opacity = seg(t, A.start + .2, A.start + .8) * (1 - endShow);
+
+  /* recommender */
+  const bd = B.end - B.start, bt = t - B.start, recA = win(t, B.start + .1, C.start + .6, .5);
+  rec.setAttribute('opacity', recA); rec.setAttribute('transform', `translate(${(1 - eo5(seg(bt, 0, .8))) * -120},0)`);
+  recRows.forEach((r, n) => { const k0 = bd * (.18 + n * .1), qq = eo(seg(bt, k0, k0 + .35)); r.sel.setAttribute('opacity', qq); r.ck.setAttribute('opacity', qq);
+    const rp = seg(bt, k0, k0 + .7); r.rp.setAttribute('r', 10 + 60 * rp); r.rp.setAttribute('opacity', rp > 0 && rp < 1 ? (1 - rp) * .8 : 0); });
+  badge.setAttribute('opacity', seg(t, B.start + bd * .55, B.start + bd * .66) * (1 - hiOff)); badge.setAttribute('transform', `translate(0,${(1 - eo5(seg(t, B.start + bd * .55, B.start + bd * .7))) * 40})`);
+
+  /* tool card emerging from the Mutect2 station, then the sandbox */
+  const cardA = win(ctt, cd * .17, cd * .55, .4), st = ord(0, 3);
+  card.setAttribute('opacity', cardA); card.setAttribute('transform', `translate(1060,245) scale(${eb(seg(ctt, cd * .17, cd * .17 + .55) || .001)}) translate(-1060,-245)`);
+  [...cin, ...cout].forEach((ch, n) => { const k = eo(seg(ctt, cd * .17 + .5 + n * .12, cd * .17 + .85 + n * .12)); ch.setAttribute('opacity', k); ch.setAttribute('transform', `translate(0,${(1 - k) * 14})`); });
+  conn.setAttribute('d', `M${st.x + 14},${st.y - 6} C${st.x + 50},${st.y - 40} ${st.x + 30},245 1060,245`); conn.setAttribute('opacity', cardA * .9);
+  if (cardA > 0) rings[1].el.setAttribute('opacity', Math.max(0, cardA * .9 * (.6 + .4 * Math.sin(t * 6))));
+  const sbA = win(ctt, cd * .56, cd + .6, .5); sb.setAttribute('opacity', sbA); sb.setAttribute('transform', `translate(0,${(1 - eo5(seg(ctt, cd * .56, cd * .56 + .8))) * 70})`);
+  tg.forEach((g, n) => { const k = eo(seg(ctt, cd * .62 + n * .3, cd * .62 + .3 + n * .3)); g.r.setAttribute('fill', mix('#1e293b', '#2563eb', k)); g.r.setAttribute('stroke', mix('#475569', '#60a5fa', k)); });
+  let lastN = 0, lastK = 0; code.forEach((s, n) => { const k = Math.floor(clamp((ctt - cd * .7 - n * .5) / .55) * s.length); codeEl[n].textContent = s.slice(0, k); if (k > 0) { lastN = n; lastK = k; } });
+  cursor.setAttribute('x', 556 + lastK * 14.4 + 4); cursor.setAttribute('y', 856 + lastN * 36 - 22); cursor.setAttribute('opacity', sbA * (Math.sin(t * 9) > 0 ? 1 : .2));
+  files.forEach((f, n) => { const k0 = cd * .86 + n * .35, k = eb(seg(ctt, k0, k0 + .6) || 0), a = seg(ctt, k0, k0 + .2) * (1 - seg(t, E.start, E.start + .5));
+    f.g.setAttribute('opacity', a); f.g.setAttribute('transform', `translate(${(1 - k) * -260},${(1 - k) * -90 * (n ? -1 : 1)}) rotate(${(1 - k) * -6})`); });
+
+  /* end */
+  const et = t - E.start, offs = seg(et, ed * .62, ed * .7);
+  fin.setAttribute('opacity', seg(et, .6, 1) * (1 - offs));
+  chipsNow.forEach((ch, n) => { const k0 = ed * .2 + n * .22, k = eb(seg(et, k0, k0 + .55) || 0); ch.setAttribute('opacity', seg(et, k0, k0 + .25)); ch.setAttribute('transform', `translate(0,${(1 - k) * 50})`); });
+  chipsNext.forEach((ch, n) => { const k0 = ed * .38 + n * .25, k = eb(seg(et, k0, k0 + .55) || 0); ch.setAttribute('opacity', seg(et, k0, k0 + .25)); ch.setAttribute('transform', `translate(0,${(1 - k) * 50})`); });
+  nowLab.setAttribute('opacity', seg(et, ed * .2 + .6, ed * .2 + 1)); nextLab.setAttribute('opacity', seg(et, ed * .38 + 1, ed * .38 + 1.4));
+
+  /* transition sweeps */
+  let sa = 0, sx = -900;
+  [T.start + .5, I.start - .1, E.start + ed * .74].forEach(tb => { const k = seg(t, tb, tb + .85); if (k > 0 && k < 1) { sx = lerp(-700, 2400, eio(k)); sa = Math.sin(k * Math.PI); } });
+  sweepEl.style.transform = `translateX(${sx}px) skewX(-18deg)`; sweepEl.style.opacity = sa;
+
+  const cs = TL.segs.find(s => t >= s.start && t < s.end);
+  if (cs) { capEl.textContent = cs.cap; capEl.style.opacity = seg(t, cs.start + .15, cs.start + .5) * (1 - seg(t, cs.end - .3, cs.end)); } else capEl.style.opacity = 0;
+}
+window.render = render;
+document.fonts.load('800 168px "Inter 24pt"').then(() => document.fonts.ready).then(() => {
+  [...'MetrOmics'].forEach((c, i) => { wl[i] = word[i].getComputedTextLength(); }); window.READY = true; const q = new URLSearchParams(location.search).get('t'); render(q ? +q : 0); });
+</script>
